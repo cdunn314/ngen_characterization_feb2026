@@ -1,0 +1,1399 @@
+{
+    "general_data": {
+        "description": "nGen DT generator angular characterization test",
+        "run_nb": 1,
+        "date": "2/25/2026",
+        "purpose_of_run": "Observing effect of 3.5% H2 on release dynamics compared to 1000 ppm. Using nGen DT generator for the first time. Attempting to replicate run 1, 3, 4, 5 TBR and fluence."
+    },
+    "generators": [
+        {
+            "name": "nGen-400",
+            "enabled": true,
+            "anode_voltage": {
+                "value": 120,
+                "unit": "kV"
+            },
+            "anode_current": {
+                "value": 350,
+                "unit": "uA"
+            },
+            "periods": [
+                {
+                    "start": "2/26/2026 12:30",
+                    "end": "2/26/2026 14:20"
+                },
+                {
+                    "start": "2/26/2026 15:00",
+                    "end": "2/26/2026 18:50"
+                }
+            ]
+        }
+    ],
+    "notes": "nGen positioned under the work surface, at an angle to the long edge of the epoxy table. Target plane aligned with the axis of the vessel, axis of the generator perpendicular to the axis of the vessel. Center of target plane at a distance of 5.5 cm under the bottom of the epoxy plate. Briefly raised to 140 kV to raise anode voltage to desired value.",
+    "neutron_detection": {
+        "foils": [
+            {
+                "enabled": true,
+                "detector_type": "HPGe",
+                "position": "height of target plane, foils facing source point perpendicularly",
+                "data_url": null,
+                "data_directory": "HPGe/260225_nGen_charac2_HPGe/DAQ",
+                "materials": [
+                    {
+                        "angle": -90,
+                        "material": "Al",
+                        "designator": "Aluminum-1",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 1,
+                        "packet_position": [2,"top"],
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 1.1022,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0002,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.096,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Aluminum1_270deg_short_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": "under",
+                        "material": "In",
+                        "designator": "Indium-1",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 3,
+                        "distance_to_source": {
+                            "value": 2.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.9404,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0003,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.04,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Indium1_90deg_short_count1/UNFILTERED",
+                            "Indium1_90deg_long_count2/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 90,
+                        "material": "In",
+                        "designator": "Indium-2",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 3,
+                        "packet_position": 4,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.7077,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0002,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.03,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Indium2_under_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 0,
+                        "material": "In",
+                        "designator": "Indium-3",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 3,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.9412,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0001,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.04,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Indium3_180deg_short_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": -90,
+                        "material": "Ti",
+                        "designator": "Titanium-1",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 1,
+                        "packet_position": [2,"bottom"],
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.5242,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0001,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.035,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Titanium_270deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 90,
+                        "material": "Ni",
+                        "designator": "Nickel-4",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 8,
+                        "packet_position": [1,"top"],
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 2.2721,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0002,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.08,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Nickel4_90deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": "under",
+                        "material": "Ni",
+                        "designator": "Nickel-1",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 2,
+                        "distance_to_source": {
+                            "value": 2.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 1.1359,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0010,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.08,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Nickel1_under_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": -90,
+                        "material": "Mo",
+                        "designator": "Molybdenum-1",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 1,
+                        "packet_position": [1, "bottom"],
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 2.0733,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0003,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.08,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Molybdenum_270deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 60,
+                        "material": "Nb",
+                        "designator": "Niobium-12",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 2,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 1.0944,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0001,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.04,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Niobium12_120deg_count1/UNFILTERED"
+                        ]  
+                    }
+                ],
+                "background_directory": "Background_long_count1/UNFILTERED",
+                "check_sources": {
+                    "Ba133 Count 1": {
+                        "directory": "Ba133_1_0uCi_Mar2014_count1/UNFILTERED",
+                        "nuclide": "Ba133",
+                        "activity": {
+                            "value": 1.0,
+                            "relative_error": 0.20,
+                            "unit": "uCi",
+                            "date": "2014-03-15"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Ba133 Count 2": {
+                        "directory": "Ba133_1_0uCi_Mar2014_count2/UNFILTERED",
+                        "nuclide": "Ba133",
+                        "activity": {
+                            "value": 1.0,
+                            "relative_error": 0.20,
+                            "unit": "uCi",
+                            "date": "2014-03-15"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Co60 Count 1": {
+                        "directory": "Co60_0_872uCi_19Mar2014_count1/UNFILTERED",
+                        "nuclide": "Co60",
+                        "activity": {
+                            "value": 0.872,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2014-03-19"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Co60 Count 2": {
+                        "directory": "Co60_0_872uCi_19Mar2014_count2/UNFILTERED",
+                        "nuclide": "Co60",
+                        "activity": {
+                            "value": 0.872,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2014-03-19"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Cs137 Count 1": {
+                        "directory": "Cs137_9_38uCi_29Sep2023_count1/UNFILTERED",
+                        "nuclide": "Cs137",
+                        "activity": {
+                            "value": 9.38,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Cs137 Count 2": {
+                        "directory": "Cs137_9_38uCi_29Sep2023_count2/UNFILTERED",
+                        "nuclide": "Cs137",
+                        "activity": {
+                            "value": 9.38,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Na22 Count 1": {
+                        "directory": "Na22_9_98uCi_29Sep2023_count1/UNFILTERED",
+                        "nuclide": "Na22",
+                        "activity": {
+                            "value": 9.98,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Na22 Count 2": {
+                        "directory": "Na22_9_98uCi_29Sep2023_count2/UNFILTERED",
+                        "nuclide": "Na22",
+                        "activity": {
+                            "value": 9.98,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Mn54 Count 1": {
+                        "directory": "Mn54_6_27uCi_2May2016_count1/UNFILTERED",
+                        "nuclide": "Mn54",
+                        "activity": {
+                            "value": 6.27,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2016-05-02"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Mn54 Count 2": {
+                        "directory": "Mn54_6_27uCi_2May2016_count2/UNFILTERED",
+                        "nuclide": "Mn54",
+                        "activity": {
+                            "value": 6.27,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2016-05-02"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    }
+                }
+            },
+            {
+                "enabled": true,
+                "detector_type": "LaBr",
+                "position": "height of target plane, foils facing source point perpendicularly",
+                "data_url": null,
+                "data_directory": "LaBr/",
+                "materials": [
+                    {
+                        "angle": 90,
+                        "material": "Cu",
+                        "designator": "Copper-1",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 1,
+                        "packet_position": [2, "bottom"],
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.4112,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0001,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.009,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "ngen_charac2_LaBr_Paul_25Feb2026/DAQ/Copper1_90deg_LaBr_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 0,
+                        "material": "Nb",
+                        "designator": "Niobium-13",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 2,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 1.1285,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0001,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.02,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "20260225_nGen_charac2_LaBr_Dunn/DAQ/Niobium13_180deg_count2/UNFILTERED"
+                        ]  
+                    }
+                ],
+                "background_directory": "20260225_nGen_charac2_LaBr_Dunn/DAQ/background_run_start_1336_01032026/UNFILTERED",
+                "check_sources": {
+                    "Ba133 Count 1": {
+                        "directory": "20260225_nGen_charac2_LaBr_Dunn/DAQ/Ba133_1uCi_Mar2014_count1/UNFILTERED",
+                        "nuclide": "Ba133",
+                        "activity": {
+                            "value": 1.0,
+                            "relative_error": 0.20,
+                            "unit": "uCi",
+                            "date": "2014-03-15"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Ba133 Count 2": {
+                        "directory": "20260225_nGen_charac2_LaBr_Dunn/DAQ/Ba133_1uCi_Mar2014_count2/UNFILTERED",
+                        "nuclide": "Ba133",
+                        "activity": {
+                            "value": 1.0,
+                            "relative_error": 0.20,
+                            "unit": "uCi",
+                            "date": "2014-03-15"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Co60 Count 1": {
+                        "directory": "20260225_nGen_charac2_LaBr_Dunn/DAQ/Co60_0_872uCi_19Mar2014_count1/UNFILTERED",
+                        "nuclide": "Co60",
+                        "activity": {
+                            "value": 0.872,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2014-03-19"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Co60 Count 2": {
+                        "directory": "20260225_nGen_charac2_LaBr_Dunn/DAQ/Co60_0_872uCi_19Mar2014_count2/UNFILTERED",
+                        "nuclide": "Co60",
+                        "activity": {
+                            "value": 0.872,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2014-03-19"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Cs137 Count 1": {
+                        "directory": "20260225_nGen_charac2_LaBr_Dunn/DAQ/Cs137_9_38uCi_29Sep2023_count1/UNFILTERED",
+                        "nuclide": "Cs137",
+                        "activity": {
+                            "value": 9.38,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Cs137 Count 2": {
+                        "directory": "20260225_nGen_charac2_LaBr_Dunn/DAQ/Cs137_9_38uCi_29Sep2023_count2/UNFILTERED",
+                        "nuclide": "Cs137",
+                        "activity": {
+                            "value": 9.38,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Na22 Count 1": {
+                        "directory": "20260225_nGen_charac2_LaBr_Dunn/DAQ/Na22_9_98uCi_29Sep2023_count3/UNFILTERED",
+                        "nuclide": "Na22",
+                        "activity": {
+                            "value": 9.98,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Na22 Count 2": {
+                        "directory": "20260225_nGen_charac2_LaBr_Dunn/DAQ/Na22_9_98uCi_29Sep2023_count2/UNFILTERED",
+                        "nuclide": "Na22",
+                        "activity": {
+                            "value": 9.98,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    }
+                }
+            },
+            {
+                "enabled": true,
+                "detector_type": "NaI",
+                "position": "height of target plane, foils facing source point perpendicularly",
+                "data_url": null,
+                "data_directory": "NaI/nGen_charac_NaI/DAQ",
+                "materials": [
+                    {
+                        "angle": -90,
+                        "material": "Al",
+                        "designator": "Aluminum-1",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 1,
+                        "packet_position": [2,"top"],
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 1.1022,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0002,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.081,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Aluminum1_long_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 90,
+                        "material": "Zr",
+                        "designator": "Zirconium-2",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 6,
+                        "packet_position": [1, "bottom"],
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.6794,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0002,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.03,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Zirconium2_90deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": -90,
+                        "material": "Zr",
+                        "designator": "Zirconium-3",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": [1, "top"],
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.4498,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0002,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.02,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Zirconium3_270deg_count1/UNFILTERED"
+                        ]
+                    },
+                    {
+                        "angle": 60,
+                        "material": "Zr",
+                        "designator": "Zirconium-9",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 1,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.4462,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0003,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.02,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Zirconium9_120deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 0,
+                        "material": "Zr",
+                        "designator": "Zirconium-11",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 1,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.4463,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0005,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.02,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Zirconium11_180deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 30,
+                        "material": "Zr",
+                        "designator": "Zirconium-10",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 1,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.4445,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0003,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.02,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Zirconium10_150deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": "under",
+                        "material": "Zr",
+                        "designator": "Zirconium-12",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 1,
+                        "packet_position": 1,
+                        "distance_to_source": {
+                            "value": 2.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.1115,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0003,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.005,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Zirconium12_under_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 120,
+                        "material": "Nb",
+                        "designator": "Niobium-10",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 2,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 1.1373,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0002,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.04,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Niobium10_60deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 30,
+                        "material": "Nb",
+                        "designator": "Niobium-11",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 2,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 1.0829,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0002,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.04,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Niobium11_150deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 60,
+                        "material": "Nb",
+                        "designator": "Niobium-12",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 2,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 1.0944,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0001,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.04,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Niobium12_120deg_count2/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 0,
+                        "material": "Nb",
+                        "designator": "Niobium-13",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 2,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 1.1285,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0001,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.04,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Niobium13_180deg_count1/UNFILTERED"
+                        ]  
+                    }
+                ],
+                "background_directory": "Background_count1/UNFILTERED",
+                "check_sources": {
+                    "Co60 Count 1": {
+                        "directory": "Co60_0_872uCi_19Mar2014_count1/UNFILTERED",
+                        "nuclide": "Co60",
+                        "activity": {
+                            "value": 0.872,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2014-03-19"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Co60 Count 2": {
+                        "directory": "Co60_0_872uCi_19Mar2014_count2/UNFILTERED",
+                        "nuclide": "Co60",
+                        "activity": {
+                            "value": 0.872,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2014-03-19"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Cs137 Count 1": {
+                        "directory": "Cs137_9_38uCi_29Sep2023_count1/UNFILTERED",
+                        "nuclide": "Cs137",
+                        "activity": {
+                            "value": 9.38,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Cs137 Count 2": {
+                        "directory": "Cs137_9_38uCi_29Sep2023_count2/UNFILTERED",
+                        "nuclide": "Cs137",
+                        "activity": {
+                            "value": 9.38,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Na22 Count 1": {
+                        "directory": "Na22_9_98uCi_29Sep2023_count1/UNFILTERED",
+                        "nuclide": "Na22",
+                        "activity": {
+                            "value": 9.98,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": [1274.537],
+                        "intensities": [0.9994],
+                        "half_life": {
+                            "value": 2.6018,
+                            "unit": "year"
+                        }
+                    },
+                    "Na22 Count 2": {
+                        "directory": "Na22_9_98uCi_29Sep2023_count2/UNFILTERED",
+                        "nuclide": "Na22",
+                        "activity": {
+                            "value": 9.98,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2023-09-29"
+                        },
+                        "energies": [1274.537],
+                        "intensities": [0.9994],
+                        "half_life": {
+                            "value": 2.6018,
+                            "unit": "year"
+                        }
+                    },
+                    "Mn54 Count 1": {
+                        "directory": "Mn54_6_27uCi_2May2016_count1/UNFILTERED",
+                        "nuclide": "Mn54",
+                        "activity": {
+                            "value": 6.27,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2016-05-02"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    },
+                    "Mn54 Count 2": {
+                        "directory": "Mn54_6_27uCi_2May2016_count2/UNFILTERED",
+                        "nuclide": "Mn54",
+                        "activity": {
+                            "value": 6.27,
+                            "relative_error": 0.05,
+                            "unit": "uCi",
+                            "date": "2016-05-02"
+                        },
+                        "energies": null,
+                        "intensities": null,
+                        "half_life": {
+                            "value": null,
+                            "unit": null
+                        }
+                    }
+                }
+            }
+        ],
+        "diamond": {
+            "enabled": true,
+            "note": null,
+            "measurements":[
+                {
+                    "angle": -9,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-9deg/RAW"
+                },
+                {
+                    "angle": -18,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-18deg/RAW"
+                },
+                {
+                    "angle": -27,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-27deg/RAW"
+                },
+                {
+                    "angle": -36,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-36deg/RAW"
+                },
+                {
+                    "angle": -45,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-45deg/RAW"
+                },
+                {
+                    "angle": -54,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-54deg/RAW"
+                },
+                {
+                    "angle": -63,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-63deg/RAW"
+                },
+                {
+                    "angle": -72,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-72deg/RAW"
+                },
+                {
+                    "angle": -81,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-81deg/RAW"
+                },
+                {
+                    "angle": -90,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-90deg/RAW"
+                },
+                {
+                    "angle": -99,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-99deg/RAW"
+                },
+                {
+                    "angle": -108,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-108deg/RAW"
+                },
+                {
+                    "angle": -117,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-117deg/RAW"
+                },
+                {
+                    "angle": -126,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-126deg/RAW"
+                },
+                {
+                    "angle": -135,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/-135deg/RAW"
+                },
+                {
+                    "angle": 0,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/0deg/RAW"
+                },
+                {
+                    "angle": 9,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/9deg/RAW"
+                },
+                {
+                    "angle": 18,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/18deg/RAW"
+                },
+                {
+                    "angle": 27,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/27deg/RAW"
+                },
+                {
+                    "angle": 36,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/36deg/RAW"
+                },
+                {
+                    "angle": 45,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/45deg/RAW"
+                },
+                {
+                    "angle": 54,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/54deg/RAW"
+                },
+                {
+                    "angle": 63,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/63deg/RAW"
+                },
+                {
+                    "angle": 72,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/72deg/RAW"
+                },
+                {
+                    "angle": 81,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/81deg/RAW"
+                },
+                {
+                    "angle": 90,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/90deg/RAW"
+                },
+                {
+                    "angle": 99,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/99deg/RAW"
+                },
+                {
+                    "angle": 108,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/108deg/RAW"
+                },
+                {
+                    "angle": 117,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/117deg/RAW"
+                },
+                {
+                    "angle": 126,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/126deg/RAW"
+                },
+                {
+                    "angle": 135,
+                    "source_to_detector_distance": {
+                        "value": 12.6,
+                        "unit": "cm",
+                        "note": "From center of generator source to front surface of diamond detector"
+                    },
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/135deg/RAW"
+                }
+            ],
+            "calibration_measurements": [
+                {
+                    "source": "Ra226",
+                    "energies": [4424.1, 4965.9, 5158.0, 5688.7, 7418.0],
+                    "data_directory": "260225_Starfire_nGen_characterization/DAQ/Ra226_calib/RAW"
+                }
+            ]
+        }
+    }
+
+}
