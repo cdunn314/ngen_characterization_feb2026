@@ -90,3 +90,10 @@ dmypy.json
 # Custom ignores
 *.xml
 *.BIN
+DAQ/
+statepoint*
+*Zone.Identifier
+autosave*
+summary.h5
+
+
