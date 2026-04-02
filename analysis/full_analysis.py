@@ -26,7 +26,7 @@ sys.path.append(str(Path(__file__).parent / '../analysis/foils'))
 sys.path.append(str(Path(__file__).parent / '../analysis/diamond'))
 sys.path.append(str(Path(__file__).parent / '../neutronics'))
 from neutron_source import nGen_generator
-from experiment_model import create_experiment_model, get_xs_from_tallies
+from experiment_model import create_experiment_model, get_xs_from_tallies, get_diamond_n_alpha_rates
 
 def run_notebook(notebook_path: Path):
     """Run a Jupyter notebook using nbconvert."""
@@ -217,6 +217,165 @@ def read_foil_xs_from_processed_data(json_path=None):
     return foil_xs_dict
 
 
+def plot_diamond_and_foil_yields(json_path=None, statepoint_path=None, output_dir=None, show_plot=True):
+    """
+    Plot diamond neutron rates and foil neutron rates together by angle.
+    
+    Diamond neutron rates are calculated as: measured_count_rate / simulated_n_alpha_rate
+    
+    Parameters
+    ----------
+    json_path : Path, optional
+        Path to the processed_data.json file. Defaults to ../data/processed_data.json.
+    statepoint_path : Path, optional
+        Path to statepoint file with diamond tally results. Defaults to statepoint.100.h5
+    output_dir : Path, optional
+        Directory to save the plot. If None, plot is not saved.
+    show_plot : bool
+        Whether to display the plot.
+    
+    Returns
+    -------
+    dict
+        Dictionary containing the loaded data for further analysis.
+    """
+    if json_path is None:
+        json_path = Path(__file__).parent / '../data/processed_data.json'
+    if statepoint_path is None:
+        statepoint_path = Path('statepoint.100.h5')
+    
+    with open(json_path, 'r') as f:
+        processed_data = json.load(f)
+    
+    fig, ax = plt.subplots(figsize=(12, 7))
+    
+    # Get simulated (n,alpha) rates from diamond tally
+    sim_diamond_rates = {}
+    if statepoint_path.exists():
+        try:
+            sim_diamond_rates = get_diamond_n_alpha_rates(statepoint_path)
+            print(f"Loaded simulated diamond rates for {len(sim_diamond_rates)} angles")
+            print("sim_diamond_rates: ", sim_diamond_rates)
+        except Exception as e:
+            print(f"Warning: Could not load diamond tally from statepoint: {e}")
+    
+    # Plot diamond neutron rates (measured / simulated)
+    diamond_data = processed_data.get('diamond', {})
+    diamond_neutron_rates = {}
+    if diamond_data and sim_diamond_rates:
+        # Reconstruct angles from array length (0, 9, 18, ..., 135)
+        n_values = len(diamond_data.get('n_alpha_rates', {}).get('values', []))
+        if n_values > 0:
+            diamond_angles = diamond_data.get('angles', [i*9 for i in range(n_values)])
+            measured_rates = np.array(diamond_data['n_alpha_rates']['values'])
+            measured_rate_errs = np.array(diamond_data['n_alpha_rates']['errors'])
+            
+            # Calculate neutron rate = measured_count_rate / simulated_n_alpha_rate
+            neutron_rates = []
+            neutron_rate_errs = []
+            valid_angles = []
+            
+            for i, angle in enumerate(diamond_angles):
+                if angle in sim_diamond_rates:
+                    sim_rate = sim_diamond_rates[angle]['n_alpha_rate']
+                    sim_rate_err = sim_diamond_rates[angle]['n_alpha_rate_err']
+                    
+                    if sim_rate > 0:
+                        n_rate = measured_rates[i] / sim_rate
+                        # Error propagation: σ(a/b) = |a/b| * sqrt((σa/a)² + (σb/b)²)
+                        if measured_rates[i] > 0:
+                            rel_err_meas = measured_rate_errs[i] / measured_rates[i] if measured_rates[i] > 0 else 0
+                            rel_err_sim = sim_rate_err / sim_rate if sim_rate > 0 else 0
+                            n_rate_err = n_rate * np.sqrt(rel_err_meas**2 + rel_err_sim**2)
+                        else:
+                            n_rate_err = 0
+                        
+                        neutron_rates.append(n_rate)
+                        neutron_rate_errs.append(n_rate_err)
+                        valid_angles.append(angle)
+                        diamond_neutron_rates[angle] = {'rate': n_rate, 'rate_err': n_rate_err}
+            
+            if valid_angles:
+                ax.errorbar(valid_angles, neutron_rates, yerr=neutron_rate_errs,
+                           fmt='s-', markersize=8, capsize=4, label='Diamond neutron rate',
+                           color='tab:blue', linewidth=2, alpha=0.8)
+                print(f"Plotted diamond neutron rates: {len(valid_angles)} angles from {valid_angles[0]}° to {valid_angles[-1]}°")
+    elif diamond_data:
+        # Fallback: just plot raw measured rates if no simulation available
+        n_values = len(diamond_data.get('n_alpha_rates', {}).get('values', []))
+        if n_values > 0:
+            diamond_angles = diamond_data.get('angles', [i*9 for i in range(n_values)])
+            n_alpha_rates = np.array(diamond_data['n_alpha_rates']['values'])
+            n_alpha_rate_errs = np.array(diamond_data['n_alpha_rates']['errors'])
+            
+            ax.errorbar(diamond_angles, n_alpha_rates, yerr=n_alpha_rate_errs,
+                       fmt='s-', markersize=8, capsize=4, label='Diamond (n,α) count rate (raw)',
+                       color='tab:blue', linewidth=2, alpha=0.8)
+            print(f"Plotted raw diamond count rates (no simulation): {n_values} angles")
+    
+    # Plot foil rates by nuclide
+    foil_data = processed_data.get('foils', {})
+    markers = {'Nb93': '^', 'Zr90': 'o', 'Al27': 'D', 'In115': 'v', 'Cu65': 'p', 'Ti48': 'h'}
+    colors = {'Nb93': 'tab:green', 'Zr90': 'tab:orange', 'Al27': 'tab:red', 
+              'In115': 'tab:purple', 'Cu65': 'tab:brown', 'Ti48': 'tab:pink'}
+    
+    for detector_type, nuclides in foil_data.items():
+        for nuclide, angles_data in nuclides.items():
+            if not angles_data:
+                continue
+            foil_angles = []
+            foil_rates = []
+            foil_rate_errs = []
+            for angle_str, rate_data in angles_data.items():
+                try:
+                    foil_angles.append(float(angle_str))
+                    foil_rates.append(rate_data['rate'] * 4 * np.pi * 12.0**2)  # convert to n/s
+                    foil_rate_errs.append(rate_data['rate_err'])
+                except (ValueError, KeyError):
+                    continue
+            
+            if foil_angles:
+                sort_idx = np.argsort(np.abs(foil_angles))
+                foil_angles = np.abs(np.array(foil_angles))[sort_idx]
+                foil_rates = np.array(foil_rates)[sort_idx]
+                foil_rate_errs = np.array(foil_rate_errs)[sort_idx]
+                
+                marker = markers.get(nuclide, 'x')
+                color = colors.get(nuclide, 'gray')
+                ax.errorbar(foil_angles, foil_rates, yerr=foil_rate_errs,
+                           fmt=marker, markersize=10, capsize=4,
+                           label=f'{detector_type} - {nuclide}',
+                           color=color, linewidth=1.5, alpha=0.8)
+                print(f"Plotted {detector_type} {nuclide}: {len(foil_angles)} angles")
+    
+    ax.set_xlabel('Angle (degrees)', fontsize=14)
+    ax.set_ylabel('Neutron Rate (n/s)', fontsize=14)
+    ax.set_title('Diamond and Foil Neutron Rates vs Angle', fontsize=16)
+    ax.legend(loc='best', fontsize=11)
+    ax.grid(alpha=0.3)
+    ax.set_xlim(left=-5)
+    ax.set_ylim(bottom=0)
+    
+    plt.tight_layout()
+    
+    if output_dir:
+        output_path = output_dir / 'diamond_foil_yields_comparison.png'
+        plt.savefig(output_path, dpi=150)
+        print(f"Saved plot to {output_path}")
+    
+    if show_plot:
+        plt.show()
+    else:
+        plt.close()
+    
+    return {
+        'diamond': diamond_data,
+        'diamond_neutron_rates': diamond_neutron_rates,
+        'sim_diamond_rates': sim_diamond_rates,
+        'foils': foil_data
+    }
+
+
 def plot_source_directions(particle_directions, energies, output_dir=Path('.'), iteration=0):
     fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(15, 5))
     fig2 = plt.figure()
@@ -316,12 +475,13 @@ def perform_full_analysis(iteration=0, output_dir=None,
     # build OpenMC model with this source and run it
     model, foil_cell_volumes = create_experiment_model(
         read_from_json=True,
-        irdff_energy_groups=np.array([0, 2, 3, 6, 9, 12, 15]) * 1e6, # energy group boundaries in eV
+        # irdff_energy_groups=np.array([0, 2, 3, 6, 9, 12, 15]) * 1e6, # energy group boundaries in eV
+        irdff_energy_groups=np.array([0, 14.1e6]), # single energy group for total cross-section
         source=None,
         source_center=source_center,
         dd_dt_ratio=0.0,
-        diamond_detector_distance=14.1 + 1.70, # 14.1 cm from source to detector face, about 1.70 cm from detector face to diamond face
-        num_particles_per_batch=int(1e4)
+        diamond_detector_distance=14.1, # 14.1 cm from source to detector face, about 1.70 cm from detector face to diamond face
+        num_particles_per_batch=int(1e5)
     )
     model.export_to_model_xml()
     # if iteration==0:
@@ -336,6 +496,17 @@ def perform_full_analysis(iteration=0, output_dir=None,
     print(foil_xs_dict)
 
     add_foil_xs_to_processed_data(foil_xs_dict)
+
+    # run foil analysis notebook
+    nai_notebook_path = Path(__file__).parent / "foils" / "foil_analysis_NaI.ipynb"
+    # if not run_notebook(nai_notebook_path):
+    #     print("Error: NaI foil analysis notebook failed. Skipping this iteration.")
+    #     return
+    
+    data = plot_diamond_and_foil_yields(json_path=Path(__file__).parent / '../data/processed_data.json',
+                                        statepoint_path=Path(__file__).parent / 'statepoint.100.h5',
+                                        output_dir=Path(__file__).parent, 
+                                        show_plot=True)
 
 
 

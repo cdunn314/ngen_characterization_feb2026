@@ -139,6 +139,7 @@ def create_foils(foil_angles, foil_distance, source_center,
 
     return foil_cells, foil_regions
 
+
 def create_diamond(diamond_angles, diamond_distances, source_center):
     diamond_cells = []
     diamond_regions = []
@@ -452,17 +453,38 @@ def get_xs_from_tallies(statepoint_path: Path, foil_cell_volumes: dict, json_pat
         foil_cell_ids = tally.find_filter(openmc.CellFilter).bins
         # find the part of the irdff_tally name inside parentheses, which should be the reaction type
         mt_name = name.split(' ')[-3]
-        for c,cell_id in enumerate(foil_cell_ids):
+        
+        # Get full tally data once per tally
+        reaction_rate_data = tally.get_reshaped_data(value="mean").squeeze()
+        n_cells = len(foil_cell_ids)
+        
+        for c, cell_id in enumerate(foil_cell_ids):
             cell_name = all_cells[cell_id].name
             xs_key = cell_name + "_" + mt_name
-            reaction_rate = tally.get_reshaped_data(value="mean").squeeze()
-            if len(reaction_rate.shape) == 2:
-                reaction_rate = reaction_rate[c, :]
-
+            
+            # Extract reaction rate for this specific cell
+            if n_cells == 1:
+                # Only one cell, reaction_rate_data is already for this cell
+                reaction_rate = reaction_rate_data
+            elif len(reaction_rate_data.shape) >= 2:
+                # Multiple cells with energy groups: shape is (n_cells, n_energy_groups)
+                reaction_rate = reaction_rate_data[c, ...]
+            else:
+                # Multiple cells, no energy groups: shape is (n_cells,)
+                reaction_rate = reaction_rate_data[c]
 
             # get flux for that cell
             flux_index = np.where(np.array(flux_tally_cell_ids) == cell_id)[0][0]
-            flux = flux_tally.get_reshaped_data(value="mean").squeeze()[flux_index, :]
+            flux_data = flux_tally.get_reshaped_data(value="mean").squeeze()
+            n_flux_cells = len(flux_tally_cell_ids)
+            if n_flux_cells == 1:
+                flux = flux_data
+            elif len(flux_data.shape) >= 2:
+                flux = flux_data[flux_index, ...]
+            else:
+                flux = flux_data[flux_index]
+            flux = np.atleast_1d(flux)  # ensure flux is at least 1D
+            reaction_rate = np.atleast_1d(reaction_rate)  # ensure reaction_rate is at least 1D
             # flux *= foil_cell_volumes[cell_name]
 
             # get nuclide fraction
@@ -487,6 +509,100 @@ def get_xs_from_tallies(statepoint_path: Path, foil_cell_volumes: dict, json_pat
     return foil_xs_dict
 
 
+def get_diamond_n_alpha_rates(statepoint_path: Path):
+    """
+    Get (n,α) rates from the diamond tally in a statepoint file.
+    
+    Parameters
+    ----------
+    statepoint_path : Path
+        Path to the statepoint file.
+    
+    Returns
+    -------
+    dict
+        Dictionary with angle (degrees) as keys and dict with 'rate', 'rate_err', 
+        'flux', 'flux_err' as values.
+    """
+    diamond_rates = {}
+    
+    with openmc.StatePoint(statepoint_path) as sp:
+        diamond_tally = sp.get_tally(name='diamond tally')
+        geometry = sp.summary.geometry
+        
+        diamond_cell_ids = diamond_tally.find_filter(openmc.CellFilter).bins
+        all_cells = geometry.get_all_cells()
+        
+        # Get (n,a) data
+        n_alpha_data = diamond_tally.get_reshaped_data(value="mean")
+        n_alpha_err = diamond_tally.get_reshaped_data(value="std_dev")
+        
+        # Get flux data
+        flux_data = diamond_tally.get_reshaped_data(value="mean")
+        flux_err = diamond_tally.get_reshaped_data(value="std_dev")
+        
+        # Diamond tally has scores ['flux', '(n,a)'], so index 0 is flux, index 1 is (n,a)
+        # Shape should be (n_cells, n_scores)
+        n_alpha_data = n_alpha_data.squeeze()
+        n_alpha_err = n_alpha_err.squeeze()
+        flux_data = flux_data.squeeze()
+        flux_err = flux_err.squeeze()
+        
+        n_cells = len(diamond_cell_ids)
+        
+        for c, cell_id in enumerate(diamond_cell_ids):
+            cell_name = all_cells[cell_id].name
+            
+            # Parse angle from cell name (format: "Diamond_detector_{angle}deg")
+            try:
+                angle_str = cell_name.split('_')[-1].replace('deg', '')
+                angle = float(angle_str)
+            except (ValueError, IndexError):
+                print(f"Could not parse angle from cell name: {cell_name}")
+                continue
+            
+            # Extract rates for this cell
+            if n_cells == 1:
+                # Single cell case
+                if len(n_alpha_data.shape) >= 1 and n_alpha_data.shape[-1] == 2:
+                    n_alpha_rate = n_alpha_data[1]
+                    n_alpha_rate_err = n_alpha_err[1]
+                    flux = flux_data[0]
+                    flux_error = flux_err[0]
+                else:
+                    n_alpha_rate = n_alpha_data
+                    n_alpha_rate_err = n_alpha_err
+                    flux = flux_data
+                    flux_error = flux_err
+            else:
+                # Multiple cells case
+                if len(n_alpha_data.shape) >= 2:
+                    # Shape is (n_cells, n_scores) where scores are [flux, (n,a)]
+                    n_alpha_rate = n_alpha_data[c, 1]
+                    n_alpha_rate_err = n_alpha_err[c, 1]
+                    flux = flux_data[c, 0]
+                    flux_error = flux_err[c, 0]
+                else:
+                    n_alpha_rate = n_alpha_data[c]
+                    n_alpha_rate_err = n_alpha_err[c]
+                    flux = flux_data[c]
+                    flux_error = flux_err[c]
+            
+            diamond_rates[angle] = {
+                'n_alpha_rate': float(n_alpha_rate),
+                'n_alpha_rate_err': float(n_alpha_rate_err),
+                'flux': float(flux),
+                'flux_err': float(flux_error),
+                'cell_name': cell_name
+            }
+    
+    # Sort by angle
+    diamond_rates = dict(sorted(diamond_rates.items()))
+    
+    print(f"Retrieved (n,α) rates for {len(diamond_rates)} diamond detector angles")
+    return diamond_rates
+
+
 
 def create_experiment_model(foil_angles=None,
                             diamond_angles=None,
@@ -506,6 +622,7 @@ def create_experiment_model(foil_angles=None,
         foil_angles = []
     if diamond_angles is None:
         diamond_angles, diamond_detector_distances = get_diamond_info_from_json()
+        print("Diamond detector distances from JSON:", diamond_detector_distances)
     else:
         diamond_detector_distances = [diamond_detector_distance] * len(diamond_angles)
 

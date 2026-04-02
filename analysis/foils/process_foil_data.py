@@ -19,11 +19,13 @@ from libra_toolbox.neutron_detection.activation_foils.compass import (
     SampleMeasurement,
 )
 from libra_toolbox.tritium.model import ureg
+from libra_toolbox.neutron_detection.activation_foils.explicit import get_chain
 from datetime import date, datetime
 import json
 from zoneinfo import ZoneInfo
 import copy
 import numpy as np
+from scipy.optimize import nnls
 import sys
 script_dir = Path(__file__).parent.resolve()
 sys.path.append(str(script_dir.parent.parent / "neutronics"))
@@ -880,3 +882,738 @@ def calculate_neutron_flux_from_foil_with_xs(foil_measurements,
                 neutron_flux_errs[f"Count {count_num}"][reaction][ch] = neutron_flux_err
 
     return neutron_fluxes, neutron_flux_errs
+
+
+def calculate_and_save_gamma_emitted(foil_measurements, 
+                                      foil_name,
+                                      background_meas,
+                                      calibration_coeffs,
+                                      efficiency_coeffs,
+                                      search_width=330,
+                                      detector_efficiency=None,
+                                      detector_efficiency_err=0.0,
+                                      json_path=None):
+    """
+    Calculate gamma emitted from foil measurements and save to processed_data.json.
+    
+    Similar to calculate_neutron_flux_from_foil_with_xs but only calculates 
+    and saves the gamma emitted values without computing neutron flux.
+    
+    Parameters
+    ----------
+    foil_measurements : dict
+        Dictionary of foil measurements with structure:
+        {foil_name: {"foil": ActivationFoil, "measurements": {count_num: SampleMeasurement}}}
+    foil_name : str
+        Name of the foil to process
+    background_meas : Measurement
+        Background measurement
+    calibration_coeffs : dict
+        Energy calibration coefficients per channel
+    efficiency_coeffs : dict
+        Efficiency coefficients per channel
+    search_width : float, optional
+        Peak search width in keV. Default is 330.
+    detector_efficiency : float or dict, optional
+        Detection efficiency. If dict, keyed by channel number.
+    detector_efficiency_err : float or dict, optional
+        Detection efficiency uncertainty. If dict, keyed by channel number.
+    json_path : Path, optional
+        Path to the processed_data.json file. Defaults to ../../data/processed_data.json.
+    
+    Returns
+    -------
+    gamma_emitted_dict : dict
+        Dictionary with structure (averaged across counts): 
+        {foil_name: {reaction: {channel: {gamma_energy_keV: {"value": val, "error": err}}}}}
+    """
+    # Temporary storage for collecting values across counts
+    temp_storage = {}  # {(ch, energy_key): [(value, error), ...]}
+    
+    foil = foil_measurements[foil_name]["foil"]
+    
+    # Get the reaction type from the foil
+    reaction_name = foil.reaction.type if hasattr(foil.reaction, 'type') else "unknown"
+    
+    # Get gamma energies for this reaction
+    gamma_energies = np.atleast_1d(foil.reaction.product.energy)
+
+    for count_num, measurement in foil_measurements[foil_name]["measurements"].items():
+        for detector in measurement.detectors:
+            ch = detector.channel_nb
+
+            if isinstance(detector_efficiency, dict):
+                det_eff = detector_efficiency.get(ch, None)
+            else:
+                det_eff = detector_efficiency
+            if isinstance(detector_efficiency_err, dict):
+                det_eff_err = detector_efficiency_err.get(ch, 0.0)
+            else:
+                det_eff_err = detector_efficiency_err
+
+            gamma_emitted, gamma_emitted_err = measurement.get_gamma_emitted(
+                background_measurement=background_meas,
+                calibration_coeffs=calibration_coeffs[ch],
+                efficiency_coeffs=efficiency_coeffs[ch],
+                channel_nb=ch,
+                search_width=search_width,
+                detection_efficiency=det_eff,
+                detection_efficiency_err=det_eff_err)
+
+            gamma_emitted = np.atleast_1d(gamma_emitted)
+            gamma_emitted_err = np.atleast_1d(gamma_emitted_err)
+            
+            for i, gamma_energy in enumerate(gamma_energies):
+                energy_key = f"{gamma_energy:.2f}_keV"
+                key = (ch, energy_key)
+                
+                if key not in temp_storage:
+                    temp_storage[key] = []
+                
+                val = float(gamma_emitted[i]) if i < len(gamma_emitted) else 0.0
+                err = float(gamma_emitted_err[i]) if i < len(gamma_emitted_err) else 0.0
+                temp_storage[key].append((val, err))
+
+                print(f"Gamma emitted for {foil_name} ({reaction_name}) Count {count_num} Channel {ch} "
+                      f"@ {gamma_energy:.2f} keV: {val:.2f} +/- {err:.2f}")
+
+    # Average across counts using inverse variance weighting
+    gamma_emitted_dict = {}
+    gamma_emitted_dict[foil_name] = {}
+    gamma_emitted_dict[foil_name][reaction_name] = {}
+    
+    for (ch, energy_key), values_list in temp_storage.items():
+        if ch not in gamma_emitted_dict[foil_name][reaction_name]:
+            gamma_emitted_dict[foil_name][reaction_name][ch] = {}
+        
+        values = np.array([v[0] for v in values_list])
+        errors = np.array([v[1] for v in values_list])
+        
+        # Weighted average (inverse variance weighting)
+        # If any error is zero, use simple average
+        if np.any(errors <= 0):
+            avg_value = np.mean(values)
+            avg_error = np.std(values) / np.sqrt(len(values)) if len(values) > 1 else 0.0
+        else:
+            weights = 1.0 / (errors ** 2)
+            avg_value = np.sum(weights * values) / np.sum(weights)
+            avg_error = 1.0 / np.sqrt(np.sum(weights))
+        
+        gamma_emitted_dict[foil_name][reaction_name][ch][energy_key] = {
+            "value": float(avg_value),
+            "error": float(avg_error),
+            "n_counts": len(values_list)
+        }
+        
+        print(f"Averaged gamma emitted for {foil_name} ({reaction_name}) Channel {ch} "
+              f"@ {energy_key}: {avg_value:.2f} +/- {avg_error:.2f} (n={len(values_list)})")
+
+    # Save to processed_data.json
+    save_gamma_emitted_to_processed_data(gamma_emitted_dict, json_path)
+    
+    return gamma_emitted_dict
+
+
+def calculate_and_save_all_gamma_emitted(foil_measurements,
+                                          background_meas,
+                                          calibration_coeffs,
+                                          efficiency_coeffs,
+                                          search_width=330,
+                                          detector_efficiency=None,
+                                          detector_efficiency_err=0.0,
+                                          json_path=None):
+    """
+    Calculate gamma emitted for all foils and save to processed_data.json.
+    
+    Parameters
+    ----------
+    foil_measurements : dict
+        Dictionary of foil measurements with structure:
+        {foil_name: {"foil": ActivationFoil, "measurements": {count_num: SampleMeasurement}}}
+    background_meas : Measurement
+        Background measurement
+    calibration_coeffs : dict
+        Energy calibration coefficients per channel
+    efficiency_coeffs : dict
+        Efficiency coefficients per channel
+    search_width : float, optional
+        Peak search width in keV. Default is 330.
+    detector_efficiency : float or dict, optional
+        Detection efficiency. If dict, keyed by channel number.
+    detector_efficiency_err : float or dict, optional
+        Detection efficiency uncertainty. If dict, keyed by channel number.
+    json_path : Path, optional
+        Path to the processed_data.json file. Defaults to ../../data/processed_data.json.
+    
+    Returns
+    -------
+    all_gamma_emitted : dict
+        Combined dictionary with all foils' gamma emitted data (averaged across counts).
+        Structure: {foil_name: {reaction: {channel: {gamma_energy_keV: {"value": val, "error": err}}}}}
+    """
+    all_gamma_emitted = {}
+    
+    for foil_name in foil_measurements.keys():
+        foil = foil_measurements[foil_name]["foil"]
+        reaction_name = foil.reaction.type if hasattr(foil.reaction, 'type') else "unknown"
+        
+        # Get gamma energies for this reaction
+        gamma_energies = np.atleast_1d(foil.reaction.product.energy)
+        
+        # Temporary storage for collecting values across counts
+        temp_storage = {}  # {(ch, energy_key): [(value, error), ...]}
+        
+        for count_num, measurement in foil_measurements[foil_name]["measurements"].items():
+            for detector in measurement.detectors:
+                ch = detector.channel_nb
+
+                if isinstance(detector_efficiency, dict):
+                    det_eff = detector_efficiency.get(ch, None)
+                else:
+                    det_eff = detector_efficiency
+                if isinstance(detector_efficiency_err, dict):
+                    det_eff_err = detector_efficiency_err.get(ch, 0.0)
+                else:
+                    det_eff_err = detector_efficiency_err
+
+                gamma_emitted, gamma_emitted_err = measurement.get_gamma_emitted(
+                    background_measurement=background_meas,
+                    calibration_coeffs=calibration_coeffs[ch],
+                    efficiency_coeffs=efficiency_coeffs[ch],
+                    channel_nb=ch,
+                    search_width=search_width,
+                    detection_efficiency=det_eff,
+                    detection_efficiency_err=det_eff_err)
+
+                gamma_emitted = np.atleast_1d(gamma_emitted)
+                gamma_emitted_err = np.atleast_1d(gamma_emitted_err)
+                
+                for i, gamma_energy in enumerate(gamma_energies):
+                    energy_key = f"{gamma_energy:.2f}_keV"
+                    key = (ch, energy_key)
+                    
+                    if key not in temp_storage:
+                        temp_storage[key] = []
+                    
+                    val = float(gamma_emitted[i]) if i < len(gamma_emitted) else 0.0
+                    err = float(gamma_emitted_err[i]) if i < len(gamma_emitted_err) else 0.0
+                    temp_storage[key].append((val, err))
+
+                    print(f"Gamma emitted for {foil_name} ({reaction_name}) Count {count_num} Channel {ch} "
+                          f"@ {gamma_energy:.2f} keV: {val:.2f} +/- {err:.2f}")
+        
+        # Average across counts for this foil
+        if foil_name not in all_gamma_emitted:
+            all_gamma_emitted[foil_name] = {}
+        all_gamma_emitted[foil_name][reaction_name] = {}
+        
+        for (ch, energy_key), values_list in temp_storage.items():
+            if ch not in all_gamma_emitted[foil_name][reaction_name]:
+                all_gamma_emitted[foil_name][reaction_name][ch] = {}
+            
+            values = np.array([v[0] for v in values_list])
+            errors = np.array([v[1] for v in values_list])
+            
+            # Weighted average (inverse variance weighting)
+            if np.any(errors <= 0):
+                avg_value = np.mean(values)
+                avg_error = np.std(values) / np.sqrt(len(values)) if len(values) > 1 else 0.0
+            else:
+                weights = 1.0 / (errors ** 2)
+                avg_value = np.sum(weights * values) / np.sum(weights)
+                avg_error = 1.0 / np.sqrt(np.sum(weights))
+            
+            all_gamma_emitted[foil_name][reaction_name][ch][energy_key] = {
+                "value": float(avg_value),
+                "error": float(avg_error),
+                "n_counts": len(values_list)
+            }
+            
+            print(f"Averaged gamma emitted for {foil_name} ({reaction_name}) Channel {ch} "
+                  f"@ {energy_key}: {avg_value:.2f} +/- {avg_error:.2f} (n={len(values_list)})")
+    
+    # Save all to processed_data.json
+    save_gamma_emitted_to_processed_data(all_gamma_emitted, json_path)
+    
+    return all_gamma_emitted
+
+
+def save_gamma_emitted_to_processed_data(gamma_emitted_dict, json_path=None):
+    """
+    Save gamma emitted data to the processed_data.json file.
+    
+    Parameters
+    ----------
+    gamma_emitted_dict : dict
+        Dictionary with foil/reaction identifiers as keys and gamma emitted values as values.
+        Structure: {foil_name: {reaction: {count_num: {channel: {gamma_energy_keV: {"value": val, "error": err}}}}}}
+    json_path : Path, optional
+        Path to the processed_data.json file. Defaults to ../../data/processed_data.json.
+    """
+    if json_path is None:
+        json_path = Path(__file__).parent / '../../data/processed_data.json'
+    
+    # Load existing data
+    if json_path.exists():
+        with open(json_path, 'r') as f:
+            processed_data = json.load(f)
+    else:
+        processed_data = {}
+    
+    # Convert numpy arrays to lists for JSON serialization
+    gamma_emitted_serializable = {}
+    for foil_name, reactions in gamma_emitted_dict.items():
+        gamma_emitted_serializable[foil_name] = {}
+        for reaction, counts in reactions.items():
+            gamma_emitted_serializable[foil_name][reaction] = {}
+            for count_num, channels in counts.items():
+                gamma_emitted_serializable[foil_name][reaction][count_num] = {}
+                for ch, energies in channels.items():
+                    gamma_emitted_serializable[foil_name][reaction][count_num][str(ch)] = {}
+                    for energy_key, data in energies.items():
+                        gamma_emitted_serializable[foil_name][reaction][count_num][str(ch)][energy_key] = {
+                            "value": float(data["value"]) if hasattr(data["value"], 'item') else data["value"],
+                            "error": float(data["error"]) if hasattr(data["error"], 'item') else data["error"]
+                        }
+    
+    # Add or update the gamma emitted data
+    processed_data['gamma_emitted'] = gamma_emitted_serializable
+    
+    # Write back to file
+    with open(json_path, 'w') as f:
+        json.dump(processed_data, f, indent=4)
+    
+    print(f"Saved gamma emitted data for {len(gamma_emitted_dict)} foils to {json_path}")
+
+
+def read_gamma_emitted_from_processed_data(json_path=None):
+    """
+    Read gamma emitted data from the processed_data.json file.
+    
+    Parameters
+    ----------
+    json_path : Path, optional
+        Path to the processed_data.json file. Defaults to ../../data/processed_data.json.
+    
+    Returns
+    -------
+    dict
+        Dictionary with foil/reaction identifiers as keys and gamma emitted values.
+    """
+    if json_path is None:
+        json_path = Path(__file__).parent / '../../data/processed_data.json'
+    
+    with open(json_path, 'r') as f:
+        processed_data = json.load(f)
+    
+    if 'gamma_emitted' not in processed_data:
+        print(f"No gamma emitted data found in {json_path}")
+        return {}
+    
+    return processed_data['gamma_emitted']
+
+
+def compute_timing_factor(foil, irradiations, time_generator_off, measurement):
+    """
+    Compute the timing factor (f_time) for a foil measurement.
+    
+    This factor accounts for:
+    - Buildup during irradiation periods (via get_chain)
+    - Decay between generator off and start of counting
+    - Decay during counting
+    - Dead time correction (live_time / real_time)
+    
+    Based on Equation 1 from Lee et al. DOI: 10.2172/1524045
+    
+    Parameters
+    ----------
+    foil : ActivationFoil
+        The activation foil object with reaction/product info
+    irradiations : list
+        List of dictionaries with 't_on' and 't_off' keys for irradiation periods
+    time_generator_off : datetime
+        Time when the generator was turned off
+    measurement : SampleMeasurement
+        The measurement object containing timing info
+    
+    Returns
+    -------
+    float
+        The timing factor f_time
+    """
+    decay_constant = foil.reaction.product.decay_constant
+    
+    # Time between generator off and start of counting
+    t_delay = (measurement.start_time - time_generator_off).total_seconds()
+    
+    # Get detector timing info (use first detector)
+    detector = measurement.detectors[0]
+    live_time = detector.live_count_time
+    real_time = detector.real_count_time
+    
+    # Compute f_time as in compass.py get_neutron_flux()
+    f_time = (
+        get_chain(irradiations, decay_constant)
+        * np.exp(-decay_constant * t_delay)
+        * (1 - np.exp(-decay_constant * real_time))
+        * (live_time / real_time)
+        / decay_constant
+    )
+    
+    return f_time
+
+
+def compute_self_attenuation_factor(foil):
+    """
+    Compute the gamma-ray self-attenuation correction factor for a foil.
+    
+    Parameters
+    ----------
+    foil : ActivationFoil
+        The activation foil object
+    
+    Returns
+    -------
+    float
+        The self-attenuation factor f_self
+    """
+    if foil.thickness is None:
+        return 1.0
+    
+    mu_rho = foil.mass_attenuation_coefficient  # cm^2/g
+    rho = foil.density  # g/cm^3
+    t = foil.thickness  # cm
+    
+    exponent = mu_rho * rho * t
+    if exponent < 1e-6:
+        return 1.0  # Avoid numerical issues for very thin foils
+    
+    f_self = (1 - np.exp(-exponent)) / exponent
+    return f_self
+
+
+def build_response_matrix(foil_measurements_list, 
+                          cross_section_dict,
+                          irradiations,
+                          time_generator_off,
+                          energy_groups):
+    """
+    Build the response matrix A for the flux unfolding problem R = A * φ.
+    
+    Each row corresponds to a reaction measurement.
+    Each column corresponds to an energy group.
+    
+    A_ij = N_i * σ_ij * f_time_i * f_self_i
+    
+    Where:
+    - N_i is the number of target atoms for foil i
+    - σ_ij is the cross section for reaction i in energy group j
+    - f_time_i is the timing factor for measurement i
+    - f_self_i is the self-attenuation factor for foil i
+    
+    Parameters
+    ----------
+    foil_measurements_list : list
+        List of tuples: (foil_name, reaction_name, foil_obj, measurement_obj)
+    cross_section_dict : dict
+        Dictionary mapping (foil_name, reaction_name) to energy-group cross sections (array)
+    irradiations : list
+        List of irradiation periods
+    time_generator_off : datetime
+        Time when generator was turned off
+    energy_groups : array
+        Energy group boundaries (length n_groups + 1)
+    
+    Returns
+    -------
+    A : ndarray
+        Response matrix of shape (n_reactions, n_energy_groups)
+    reaction_labels : list
+        Labels for each row of the matrix
+    """
+    n_reactions = len(foil_measurements_list)
+    n_energy_groups = len(energy_groups) - 1
+    
+    A = np.zeros((n_reactions, n_energy_groups))
+    reaction_labels = []
+    
+    for i, (foil_name, reaction_name, foil, measurement) in enumerate(foil_measurements_list):
+        # Get cross sections for this reaction
+        key = f"{foil_name}_{reaction_name}"
+        if key in cross_section_dict:
+            xs = np.array(cross_section_dict[key])
+        else:
+            print(f"Warning: Cross section not found for {key}, using zeros")
+            xs = np.zeros(n_energy_groups)
+        
+        # Ensure xs has the right length
+        if len(xs) != n_energy_groups:
+            print(f"Warning: Cross section length mismatch for {key}: {len(xs)} vs {n_energy_groups}")
+            if len(xs) == 1:
+                # Single group - broadcast to all groups (simple approach)
+                # In practice, you'd want energy-dependent cross sections
+                xs = np.full(n_energy_groups, xs[0])
+            else:
+                xs = np.resize(xs, n_energy_groups)
+        
+        # Number of target atoms
+        N = foil.nb_atoms
+        
+        # Timing factor
+        f_time = compute_timing_factor(foil, irradiations, time_generator_off, measurement)
+        
+        # Self-attenuation factor
+        f_self = compute_self_attenuation_factor(foil)
+        
+        # Build row of response matrix
+        A[i, :] = N * xs * f_time * f_self
+        
+        reaction_labels.append(f"{foil_name}_{reaction_name}")
+    
+    return A, reaction_labels
+
+
+def solve_flux_spectrum(R, R_err, A, energy_groups, regularization=0.0):
+    """
+    Solve the flux unfolding problem R = A * φ using non-negative least squares.
+    
+    Based on Equation 2 from INL/EXT-19-54045 (Sort_16030.pdf).
+    
+    Parameters
+    ----------
+    R : ndarray
+        Measured reaction rates (number of decays measured), shape (n_reactions,)
+    R_err : ndarray
+        Uncertainties in R, shape (n_reactions,)
+    A : ndarray
+        Response matrix, shape (n_reactions, n_energy_groups)
+    energy_groups : ndarray
+        Energy group boundaries, length (n_energy_groups + 1)
+    regularization : float, optional
+        Regularization parameter (Tikhonov). Default is 0.0 (no regularization).
+    
+    Returns
+    -------
+    phi : ndarray
+        Solved neutron flux spectrum, shape (n_energy_groups,)
+    phi_err : ndarray
+        Estimated uncertainties in phi (from residuals), shape (n_energy_groups,)
+    residual : float
+        Residual norm of the solution
+    """
+    n_reactions, n_groups = A.shape
+    
+    # Weight the system by measurement uncertainties
+    # If R_err has zeros or very small values, use a minimum uncertainty
+    weights = np.where(R_err > 0, 1.0 / R_err, 1.0)
+    
+    # Weighted least squares: minimize ||W(Aφ - R)||^2
+    A_weighted = A * weights[:, np.newaxis]
+    R_weighted = R * weights
+    
+    if regularization > 0:
+        # Tikhonov regularization: add regularization term
+        # Minimize ||W(Aφ - R)||^2 + λ||φ||^2
+        # Equivalent to augmented system: [WA; sqrt(λ)I] φ = [WR; 0]
+        sqrt_lambda = np.sqrt(regularization)
+        A_aug = np.vstack([A_weighted, sqrt_lambda * np.eye(n_groups)])
+        R_aug = np.concatenate([R_weighted, np.zeros(n_groups)])
+        phi, residual = nnls(A_aug, R_aug)
+    else:
+        phi, residual = nnls(A_weighted, R_weighted)
+    
+    # Estimate uncertainties using covariance propagation
+    # For overdetermined systems: Cov(φ) ≈ (A^T W^2 A)^{-1} * σ^2
+    # where σ^2 is estimated from residuals
+    try:
+        W2 = np.diag(weights**2)
+        ATA = A.T @ W2 @ A
+        if regularization > 0:
+            ATA += regularization * np.eye(n_groups)
+        ATA_inv = np.linalg.inv(ATA)
+        
+        # Estimate variance from residuals
+        residuals = R - A @ phi
+        sigma2 = np.sum((residuals * weights)**2) / max(1, n_reactions - n_groups)
+        
+        phi_var = np.diag(ATA_inv) * sigma2
+        phi_err = np.sqrt(np.maximum(phi_var, 0))
+    except np.linalg.LinAlgError:
+        print("Warning: Could not compute uncertainty estimates")
+        phi_err = np.zeros(n_groups)
+    
+    return phi, phi_err, residual
+
+
+def unfold_flux_from_measurements(foil_measurements,
+                                  background_meas,
+                                  calibration_coeffs,
+                                  efficiency_coeffs,
+                                  irradiations,
+                                  time_generator_off,
+                                  energy_groups,
+                                  detector_efficiency=None,
+                                  detector_efficiency_err=0.0,
+                                  search_width=330,
+                                  regularization=0.0,
+                                  json_path=None):
+    """
+    Perform full flux unfolding from foil measurements.
+    
+    This function:
+    1. Extracts gamma emitted from each foil measurement
+    2. Saves gamma emitted data to processed_data.json
+    3. Reads cross sections from processed_data.json
+    4. Builds the response matrix
+    5. Solves for the flux spectrum using NNLS
+    
+    Parameters
+    ----------
+    foil_measurements : dict
+        Dictionary of foil measurements with structure:
+        {foil_name: {"foil": ActivationFoil, "measurements": {count_num: SampleMeasurement}}}
+    background_meas : Measurement
+        Background measurement
+    calibration_coeffs : dict
+        Energy calibration coefficients per channel
+    efficiency_coeffs : dict
+        Efficiency coefficients per channel
+    irradiations : list
+        List of irradiation periods
+    time_generator_off : datetime
+        Time when generator was turned off
+    energy_groups : ndarray
+        Energy group boundaries
+    detector_efficiency : float or dict, optional
+        Detection efficiency
+    detector_efficiency_err : float or dict, optional
+        Detection efficiency uncertainty
+    search_width : float, optional
+        Peak search width in keV
+    regularization : float, optional
+        Regularization parameter for NNLS
+    json_path : Path, optional
+        Path to processed_data.json
+    
+    Returns
+    -------
+    phi : ndarray
+        Unfolded flux spectrum
+    phi_err : ndarray
+        Flux uncertainties
+    results_dict : dict
+        Dictionary containing intermediate results
+    """
+    if json_path is None:
+        json_path = Path(__file__).parent / '../../data/processed_data.json'
+    
+    # Step 1: Extract gamma emitted from each measurement
+    gamma_emitted_dict = {}
+    foil_measurements_list = []  # (foil_name, reaction_name, foil, measurement)
+    R_list = []  # Reaction rates (gamma emitted)
+    R_err_list = []  # Uncertainties
+    
+    for foil_name, foil_data in foil_measurements.items():
+        foil = foil_data["foil"]
+        gamma_emitted_dict[foil_name] = {}
+        
+        # Get the reaction type from the foil
+        reaction_name = foil.reaction.type if hasattr(foil.reaction, 'type') else "unknown"
+        gamma_emitted_dict[foil_name][reaction_name] = {}
+        
+        # Get gamma energies for this reaction
+        gamma_energies = np.atleast_1d(foil.reaction.product.energy)
+        
+        for count_num, measurement in foil_data["measurements"].items():
+            gamma_emitted_dict[foil_name][reaction_name][f"Count {count_num}"] = {}
+            
+            # Use first detector for simplicity (could average over detectors)
+            for detector in measurement.detectors:
+                ch = detector.channel_nb
+                gamma_emitted_dict[foil_name][reaction_name][f"Count {count_num}"][ch] = {}
+                
+                if isinstance(detector_efficiency, dict):
+                    det_eff = detector_efficiency.get(ch, None)
+                else:
+                    det_eff = detector_efficiency
+                if isinstance(detector_efficiency_err, dict):
+                    det_eff_err = detector_efficiency_err.get(ch, 0.0)
+                else:
+                    det_eff_err = detector_efficiency_err
+                
+                gamma_emitted, gamma_emitted_err = measurement.get_gamma_emitted(
+                    background_measurement=background_meas,
+                    calibration_coeffs=calibration_coeffs[ch],
+                    efficiency_coeffs=efficiency_coeffs[ch],
+                    channel_nb=ch,
+                    search_width=search_width,
+                    detection_efficiency=det_eff,
+                    detection_efficiency_err=det_eff_err
+                )
+                
+                # Store each gamma line separately using energy as key
+                gamma_emitted = np.atleast_1d(gamma_emitted)
+                gamma_emitted_err = np.atleast_1d(gamma_emitted_err)
+                
+                for i, gamma_energy in enumerate(gamma_energies):
+                    energy_key = f"{gamma_energy:.2f}_keV"
+                    gamma_emitted_dict[foil_name][reaction_name][f"Count {count_num}"][ch][energy_key] = {
+                        "value": float(gamma_emitted[i]) if i < len(gamma_emitted) else 0.0,
+                        "error": float(gamma_emitted_err[i]) if i < len(gamma_emitted_err) else 0.0
+                    }
+                
+                # For matrix building, sum over gamma lines (use total for reaction rate)
+                total_gamma = np.sum(gamma_emitted)
+                total_gamma_err = np.sqrt(np.sum(gamma_emitted_err**2))
+                
+                # Add to lists for matrix building
+                foil_measurements_list.append((foil_name, reaction_name, foil, measurement))
+                R_list.append(total_gamma)
+                R_err_list.append(total_gamma_err)
+                
+                # Only use first detector
+                break
+            # Only use first count
+            break
+    
+    # Step 2: Save gamma emitted to processed_data.json
+    save_gamma_emitted_to_processed_data(gamma_emitted_dict, json_path)
+    
+    # Step 3: Read cross sections from processed_data.json
+    cross_section_dict = read_foil_xs_from_processed_data(str(json_path))
+    
+    # Step 4: Build response matrix
+    A, reaction_labels = build_response_matrix(
+        foil_measurements_list,
+        cross_section_dict,
+        irradiations,
+        time_generator_off,
+        energy_groups
+    )
+    
+    R = np.array(R_list)
+    R_err = np.array(R_err_list)
+    
+    print(f"Built response matrix A with shape: {A.shape}")
+    print(f"Reaction rates R: {R}")
+    print(f"Reaction labels: {reaction_labels}")
+    
+    # Step 5: Solve for flux spectrum
+    phi, phi_err, residual = solve_flux_spectrum(
+        R, R_err, A, energy_groups, regularization=regularization
+    )
+    
+    print(f"Solved flux spectrum: {phi}")
+    print(f"Residual norm: {residual}")
+    
+    results_dict = {
+        "gamma_emitted": gamma_emitted_dict,
+        "response_matrix": A,
+        "reaction_labels": reaction_labels,
+        "reaction_rates": R,
+        "reaction_rate_errors": R_err,
+        "residual": residual,
+        "energy_groups": energy_groups
+    }
+    
+    return phi, phi_err, results_dict
