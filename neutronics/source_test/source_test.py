@@ -5,20 +5,42 @@ import sys
 sys.path.append('../')
 from neutron_source import nGen_generator
 from matplotlib import pyplot as plt
+import h5py
 
 batch_seed = 12344
 n_iterations_per_batch = 1000
 
 verbose = False
 
-neutron_source = nGen_generator(
-    energies = [13.0e6, 14.0e6, 15.0e6, 16.0e6],
-    angles = [0, 45, 90, 180],
-    spectra = [[1.0, 0.0, 0.0, 0.0],
-               [0.0, 0.5, 0.0, 0.0],
-               [0.0, 0.0, 0.1, 0.0],
-               [0.0, 0.0, 0.0, 0.01]]
-)
+def read_diamond_spectra_from_h5(h5_filename):
+
+    with h5py.File(h5_filename, 'r') as f:
+        print(f'Description: {f.attrs["description"]}')
+        print(f'\nAvailable angles:')
+        
+        loaded_data = {}
+        for name in f.keys():
+            grp = f[name]
+            loaded_data[name] = {
+                'angle': grp.attrs['angle'],
+                'energy_bins': grp['energy_bins'][:],
+                'spectrum': grp['spectrum'][:]
+            }
+    return loaded_data
+
+# neutron_source = nGen_generator(
+#     energies = [13.0e6, 14.0e6, 15.0e6, 16.0e6],
+#     angles = [0, 45, 90, 180],
+#     spectra = [[1.0, 0.0, 0.0, 0.0],
+#                [0.0, 0.5, 0.0, 0.0],
+#                [0.0, 0.0, 0.1, 0.0],
+#                [0.0, 0.0, 0.0, 0.01]]
+# )
+
+# build neutron source from diamond spectra
+source_center = [0, 0, 0]
+diamond_spectra = read_diamond_spectra_from_h5('../../data/diamond_processed_spectra.h5')
+neutron_sources = nGen_generator(diamond_spectra, center=source_center, reference_uvw=(-1, 0, 0))
 
 # create super basic model
 sphere = openmc.Sphere(r=100.0, boundary_type='vacuum')
@@ -27,7 +49,7 @@ geometry = openmc.Geometry(openmc.Universe(cells=[cell]))
 materials = openmc.Materials()
 settings = openmc.Settings()
 settings.run_mode = 'fixed source'
-settings.source = neutron_source
+settings.source = neutron_sources
 settings.batches = 100
 settings.inactive = 0
 settings.particles = n_iterations_per_batch
@@ -48,6 +70,7 @@ try:
     # Process particles from this batch
     batch_counts = 0
     for particle in particles:
+        print(f"Particle {batch_counts + 1}: x={particle.r[0]}, y={particle.r[1]}, z={particle.r[2]}, energy={particle.E}")
         u,v,w = particle.u
         particle_directions.append((u,v,w))
         energies.append(particle.E)

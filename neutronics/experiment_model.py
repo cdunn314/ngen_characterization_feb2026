@@ -626,17 +626,139 @@ def create_experiment_model(foil_angles=None,
     else:
         diamond_detector_distances = [diamond_detector_distance] * len(diamond_angles)
 
-    ngen_cylinder = openmc.XCylinder(r=2*2.54, 
+    main_tube_outer_cylinder = openmc.XCylinder(r=10.16/2, 
                                      y0=source_center[1],
                                      z0=source_center[2])
-    tip_cylinder = openmc.XCylinder(r=0.5*2.54,
-                                   y0=source_center[1],
-                                   z0=source_center[2])
+    main_tube_inner_cylinder = openmc.XCylinder(r=9.53/2,
+                                     y0=source_center[1],
+                                     z0=source_center[2])
+    fnert_face_seal_outer_cylinder = openmc.XCylinder(r=10.04/2,
+                                     y0=source_center[1],
+                                     z0=source_center[2])
+    fnert_face_seal_inner_cylinder = openmc.XCylinder(r=4.83/2,
+                                     y0=source_center[1],
+                                     z0=source_center[2])
+    target_flange_outer_cylinder = openmc.XCylinder(r=7.11/2,
+                                     y0=source_center[1],
+                                     z0=source_center[2])
+    target_flange_inner_cylinder = fnert_face_seal_inner_cylinder
+    snout_outer_cylinder = openmc.XCylinder(r=2.54/2,
+                                     y0=source_center[1],
+                                     z0=source_center[2])
+    snout_braze_cylinder = openmc.XCylinder(r=2.3876/2,
+                                     y0=source_center[1],
+                                     z0=source_center[2])
+    snout_inner_cylinder = openmc.XCylinder(r=2.1412/2,
+                                     y0=source_center[1],
+                                     z0=source_center[2])
+    thin_copper_plug_inner_cylinder = openmc.XCylinder(r=2.0828/2,
+                                     y0=source_center[1],
+                                     z0=source_center[2])
+    target_cylinder = openmc.XCylinder(r=1.27/2,
+                                     y0=source_center[1],
+                                     z0=source_center[2])
     
-    tip_front_plane = openmc.XPlane(x0=source_center[0] - 1.0)
-    tip_back_plane = openmc.XPlane(x0=source_center[0] + 14.0)
-    ngen_back_plane = openmc.XPlane(x0=source_center[0] + 60.0)
+    
+    # front refers to the -x direction, as the source point is in the front of the source with electrical connections in the back
+    # place the source point at the inner center of the thin copper plug (not the coolant one)
+    target_back_plane = openmc.XPlane(x0=source_center[0])
+    thin_copper_plug_back_plane = openmc.XPlane(x0=source_center[0] - 0.001)
+    thin_copper_plug_middle_plane = openmc.XPlane(x0=thin_copper_plug_back_plane.x0 - 0.0508)
+    thin_copper_plug_front_plane = openmc.XPlane(x0=thin_copper_plug_back_plane.x0 -0.3175)
 
+    # the coolant plug is 1.52 cm thick, so place the back plane 1.52 cm behind the snout thin copper plug
+    # assume the coolant inlets and outlets are at 45 degree angles
+    coolant_plug_front_plane = openmc.XPlane(x0=thin_copper_plug_front_plane.x0 - 1.52)
+    coolant_plug_inlet_frustum = openmc.model.ConicalFrustum(
+        center_base=(coolant_plug_front_plane.x0, source_center[1] + 1.143/2, source_center[2]),
+        axis=(0.6886, 0, 0),
+        r1=0.7938/2,
+        r2=.7525/2
+    )
+    # both the inlet and outlets have conical frustum entries into the copper plug followed by a smaller cylindrical region
+    # and are connected by an even smaller cylindrical region (coolant_plug_flow_cylinder) perpendicular to the inlet and outlet cylinders
+    coolant_plug_inlet_cylinder2 = openmc.XCylinder(r=0.6147/2, 
+                                                    y0=source_center[1] + 1.143/2,
+                                                    z0=source_center[2])
+    coolant_plug_outlet_frustum = openmc.model.ConicalFrustum(
+        center_base=(coolant_plug_front_plane.x0, source_center[1] - 1.143/2, source_center[2]),
+        axis=(0.6886, 0, 0),
+        r1=0.7938/2,
+        r2=0.7525/2
+    )
+    coolant_plug_outlet_cylinder2 = openmc.XCylinder(r=0.6147/2, 
+                                                    y0=source_center[1] - 1.143/2,
+                                                    z0=source_center[2])
+    
+    coolant_plug_plane2 = openmc.XPlane(x0=coolant_plug_front_plane.x0 + 0.6886 + 0.4544)
+
+    coolant_plug_flow_cylinder = openmc.YCylinder(r=0.4826/2, x0=thin_copper_plug_front_plane.x0 - 0.3809, z0=source_center[2])
+    coolant_plug_flow_yplane1 = openmc.YPlane(y0=coolant_plug_inlet_cylinder2.y0)
+    coolant_plug_flow_yplane2 = openmc.YPlane(y0=coolant_plug_outlet_cylinder2.y0)
+
+    # the cutoff plane is where a screw is placed to block off the coolant flow cylinder in the actual cooling plug, but the screw is not modeled here.
+    # the chord length of the intersection of the cutoff plane with the coolant plug cylinder is 1.0776 cm, giving an apothem (distance from center of circle to center of chord) of 1.0795 cm
+    coolant_plug_cutoff_plane = openmc.YPlane(y0=source_center[1] + 1.0795)
+
+    # push_to_connect (ptc) tube fitting roughly based on McMaster-Carr part number 52065K218
+    inlet_ptc_cylinder4 = openmc.XCylinder(r=1.03/2, y0=source_center[1] + 1.143/2, z0=source_center[2])
+    inlet_ptc_cylinder3 = openmc.XCylinder(r=0.7667/2, y0=source_center[1] + 1.143/2, z0=source_center[2])
+    inlet_ptc_cylinder2 = openmc.XCylinder(r=0.635/2, y0=source_center[1] + 1.143/2, z0=source_center[2])
+    inlet_ptc_cylinder1 = openmc.XCylinder(r=0.4122/2, y0=source_center[1] + 1.143/2, z0=source_center[2])
+
+    outlet_ptc_cylinder4 = openmc.XCylinder(r=1.03/2, y0=source_center[1] - 1.143/2, z0=source_center[2])
+    outlet_ptc_cylinder3 = openmc.XCylinder(r=0.7667/2, y0=source_center[1] - 1.143/2, z0=source_center[2])
+    outlet_ptc_cylinder2 = openmc.XCylinder(r=0.635/2, y0=source_center[1] - 1.143/2, z0=source_center[2])
+    outlet_ptc_cylinder1 = openmc.XCylinder(r=0.4122/2, y0=source_center[1] - 1.143/2, z0=source_center[2])
+    
+    # ptc is 2.09 cm long overall
+    ptc_plastic_cap_front_plane = openmc.XPlane(x0=coolant_plug_front_plane.x0 + 0.6886 - 2.09)
+    # plastic cap ridge is 0.1463 cm thick
+    ptc_plastic_cap_back_plane = openmc.XPlane(x0=ptc_plastic_cap_front_plane.x0 + 0.1463)
+    # assume plastic cap ridge is 0.08 cm away from edge of ptc brass body as in CAD drawing
+    ptc_brass_body_front_plane = openmc.XPlane(x0=ptc_plastic_cap_back_plane.x0 + 0.08)
+    # plastic fitting not including the cap is 0.6517 cm long and there is a 0.08 cm gap between the plastic fitting and a sudden reduction in the brass inner diameter
+    # but before the reduction to 1-16 NPT
+    ptc_plastic_fitting_back_plane = openmc.XPlane(x0=ptc_plastic_cap_back_plane.x0 + 0.6517)
+    ptc_brass_body_inlet_midplane = openmc.XPlane(x0=ptc_plastic_fitting_back_plane.x0 + 0.08)
+
+    # conversion from 1/4inch tubing to 1-16 NPT
+    inlet_ptc_converging_frustum_inner = openmc.model.ConicalFrustum(
+        center_base=(ptc_plastic_cap_front_plane.x0 + 1.33, inlet_ptc_cylinder1.y0, inlet_ptc_cylinder1.z0),
+        axis=(coolant_plug_front_plane.x0 - (ptc_plastic_cap_front_plane.x0 + 1.33), 0, 0),
+        r1=inlet_ptc_cylinder2.r,
+        r2=inlet_ptc_cylinder1.r
+    )
+    inlet_ptc_converging_frustum_outer = openmc.model.ConicalFrustum(
+        center_base=(ptc_plastic_cap_front_plane.x0 + 1.33, inlet_ptc_cylinder1.y0, inlet_ptc_cylinder1.z0),
+        axis=(coolant_plug_front_plane.x0 - (ptc_plastic_cap_front_plane.x0 + 1.33), 0, 0),
+        r1=inlet_ptc_cylinder4.r,
+        r2=0.7938/2
+    )
+
+    outlet_ptc_converging_frustum_inner = openmc.model.ConicalFrustum(
+        center_base=(ptc_plastic_cap_front_plane.x0 + 1.33, outlet_ptc_cylinder1.y0, outlet_ptc_cylinder1.z0),
+        axis=(coolant_plug_front_plane.x0 - (ptc_plastic_cap_front_plane.x0 + 1.33), 0, 0),
+        r1=outlet_ptc_cylinder2.r,
+        r2=outlet_ptc_cylinder1.r
+    )
+    outlet_ptc_converging_frustum_outer = openmc.model.ConicalFrustum(
+        center_base=(ptc_plastic_cap_front_plane.x0 + 1.33, outlet_ptc_cylinder1.y0, outlet_ptc_cylinder1.z0),
+        axis=(coolant_plug_front_plane.x0 - (ptc_plastic_cap_front_plane.x0 + 1.33), 0, 0),
+        r1=outlet_ptc_cylinder4.r,
+        r2=0.7938/2
+    )
+
+    snout_braze_back_plane = openmc.XPlane(x0=thin_copper_plug_middle_plane.x0 + 0.1016)
+    snout_back_plane = openmc.XPlane(x0=source_center[0] + 14.43)
+    # target flange has an inner cylinder wider than the snout cylinder
+    target_flange_inner_front_plane = openmc.XPlane(x0=snout_back_plane.x0 + 0.16)
+    target_flange_inner_back_plane = openmc.XPlane(x0=target_flange_inner_front_plane.x0 + 1.30)
+    target_flange_back_plane = openmc.XPlane(x0=target_flange_inner_back_plane.x0 + 0.45)
+    fnert_face_seal_back_plane = openmc.XPlane(x0=target_flange_back_plane.x0 + 1.46)
+    main_tube_back_plane = openmc.XPlane(x0=fnert_face_seal_back_plane.x0 + 45.72)
+
+    # foil ring surfaces
 
     foil_ring_inner_cyl = openmc.ZCylinder(r=foil_ring_inner_radius,
                                            x0=source_center[0],
@@ -671,9 +793,93 @@ def create_experiment_model(foil_angles=None,
 
     hole_cylinder = openmc.XCylinder(r=0.5, y0=source_center[1], z0=source_center[2])
 
-    tip_region = -tip_cylinder & +tip_front_plane & -tip_back_plane
-    ngen_body_region = -ngen_cylinder & -ngen_back_plane & +tip_back_plane
-    ngen_region = tip_region | ngen_body_region
+    inlet_ptc_plastic_cap_region = (-inlet_ptc_cylinder4 & +inlet_ptc_cylinder2 & +ptc_plastic_cap_front_plane & -ptc_plastic_cap_back_plane) \
+                                | (-inlet_ptc_cylinder3 & +inlet_ptc_cylinder2 & +ptc_plastic_cap_back_plane & -ptc_plastic_fitting_back_plane)
+    
+    inlet_ptc_brass_body_region = (-inlet_ptc_cylinder4 & +inlet_ptc_cylinder3 & +ptc_brass_body_front_plane & -inlet_ptc_converging_frustum_inner.plane_bottom) \
+                                | (-inlet_ptc_cylinder3 & +inlet_ptc_cylinder2 & +ptc_brass_body_inlet_midplane & -inlet_ptc_converging_frustum_inner.plane_bottom) \
+                                | (-inlet_ptc_converging_frustum_outer & +inlet_ptc_converging_frustum_inner) \
+                                | (-coolant_plug_inlet_frustum & +inlet_ptc_cylinder1)
+    inlet_ptc_water_region = (-inlet_ptc_cylinder2 & +ptc_plastic_cap_front_plane & -ptc_plastic_fitting_back_plane) \
+                            | (-inlet_ptc_cylinder3 & +ptc_plastic_fitting_back_plane & -ptc_brass_body_inlet_midplane) \
+                            | (-inlet_ptc_cylinder2 & +ptc_brass_body_inlet_midplane & -inlet_ptc_converging_frustum_inner.plane_bottom) \
+                            | (-inlet_ptc_converging_frustum_inner) \
+                            | (-inlet_ptc_cylinder1 & +inlet_ptc_converging_frustum_inner.plane_top & -coolant_plug_inlet_frustum.plane_bottom)
+    
+    inlet_ptc_overall_region = (-inlet_ptc_cylinder4 & +ptc_plastic_cap_front_plane & -ptc_plastic_cap_back_plane) \
+                            | (-inlet_ptc_cylinder3 & +ptc_plastic_cap_back_plane & -ptc_brass_body_front_plane) \
+                            | (-inlet_ptc_cylinder4 & +ptc_brass_body_front_plane & -inlet_ptc_converging_frustum_inner.plane_bottom) \
+                            | (-inlet_ptc_converging_frustum_outer) \
+                            | (-coolant_plug_inlet_frustum)
+    
+    outlet_ptc_plastic_cap_region = (-outlet_ptc_cylinder4 & +outlet_ptc_cylinder2 & +ptc_plastic_cap_front_plane & -ptc_plastic_cap_back_plane) \
+                                | (-outlet_ptc_cylinder3 & +outlet_ptc_cylinder2 & +ptc_plastic_cap_back_plane & -ptc_plastic_fitting_back_plane)
+    outlet_ptc_brass_body_region = (-outlet_ptc_cylinder4 & +outlet_ptc_cylinder3 & +ptc_brass_body_front_plane & -outlet_ptc_converging_frustum_inner.plane_bottom) \
+                                | (-outlet_ptc_cylinder3 & +outlet_ptc_cylinder2 & +ptc_brass_body_inlet_midplane & -outlet_ptc_converging_frustum_inner.plane_bottom) \
+                                | (-outlet_ptc_converging_frustum_outer & +outlet_ptc_converging_frustum_inner) \
+                                | (-coolant_plug_outlet_frustum & +outlet_ptc_cylinder1)
+    outlet_ptc_water_region = (-outlet_ptc_cylinder2 & +ptc_plastic_cap_front_plane & -ptc_plastic_fitting_back_plane) \
+                            | (-outlet_ptc_cylinder3 & +ptc_plastic_fitting_back_plane & -ptc_brass_body_inlet_midplane) \
+                            | (-outlet_ptc_cylinder2 & +ptc_brass_body_inlet_midplane & -outlet_ptc_converging_frustum_inner.plane_bottom) \
+                            | (-outlet_ptc_converging_frustum_inner) \
+                            | (-outlet_ptc_cylinder1 & +outlet_ptc_converging_frustum_inner.plane_top & -coolant_plug_outlet_frustum.plane_bottom)
+    outlet_ptc_overall_region = (-outlet_ptc_cylinder4 & +ptc_plastic_cap_front_plane & -ptc_plastic_cap_back_plane) \
+                            | (-outlet_ptc_cylinder3 & +ptc_plastic_cap_back_plane & -ptc_brass_body_front_plane) \
+                            | (-outlet_ptc_cylinder4 & +ptc_brass_body_front_plane & -outlet_ptc_converging_frustum_inner.plane_bottom) \
+                            | (-outlet_ptc_converging_frustum_outer) \
+                            | (-coolant_plug_outlet_frustum)
+
+    
+    coolant_inlet_region = -coolant_plug_inlet_frustum | (+coolant_plug_inlet_frustum.plane_top & -coolant_plug_plane2 & -coolant_plug_inlet_cylinder2)
+    coolant_outlet_region = -coolant_plug_outlet_frustum | (+coolant_plug_outlet_frustum.plane_top & -coolant_plug_plane2 & -coolant_plug_outlet_cylinder2)
+    coolant_flow_region = (-coolant_plug_flow_cylinder & -coolant_plug_inlet_cylinder2) \
+                        | (-coolant_plug_flow_cylinder & -coolant_plug_outlet_cylinder2) \
+                        | (-coolant_plug_flow_cylinder & +coolant_plug_flow_yplane2 & -coolant_plug_flow_yplane1 & +coolant_plug_inlet_cylinder2 & +coolant_plug_outlet_cylinder2)
+    coolant_region = coolant_inlet_region | coolant_outlet_region | coolant_flow_region
+    coolant_plug_region = -snout_outer_cylinder & +coolant_plug_front_plane & -thin_copper_plug_front_plane & ~coolant_region & -coolant_plug_cutoff_plane
+
+    coolant_plug_rotation = (-45, 0, 0)  # rotate 45 degrees around x-axis
+    coolant_plug_pivot = (source_center[0], source_center[1], source_center[2])  # rotate around the source center
+
+    # for region in [inlet_ptc_plastic_cap_region, inlet_ptc_brass_body_region, inlet_ptc_water_region, inlet_ptc_overall_region,
+    #                     outlet_ptc_plastic_cap_region, outlet_ptc_brass_body_region, outlet_ptc_water_region, outlet_ptc_overall_region,
+    #                     coolant_region, coolant_plug_region]:
+    #     region.rotate((45,0,0), 
+    #                       pivot=(0,0,0), 
+    #                       inplace=True)
+
+    thin_copper_plug_region = (-snout_outer_cylinder & +thin_copper_plug_front_plane & -thin_copper_plug_middle_plane) \
+                            | (-thin_copper_plug_inner_cylinder & +thin_copper_plug_middle_plane & -thin_copper_plug_back_plane)
+    target_region = -snout_inner_cylinder & +thin_copper_plug_back_plane & -target_back_plane
+
+    snout_inner_region = (-snout_inner_cylinder & +target_back_plane & -snout_back_plane) \
+                        | (-snout_inner_cylinder & +target_cylinder & -target_back_plane & +thin_copper_plug_back_plane) \
+                        | (-snout_inner_cylinder & +thin_copper_plug_inner_cylinder & +thin_copper_plug_middle_plane & -thin_copper_plug_back_plane)
+    snout_wall_region = (+snout_inner_cylinder & -snout_braze_cylinder & +thin_copper_plug_middle_plane & -snout_braze_back_plane) \
+                     | (+snout_inner_cylinder & -snout_outer_cylinder & +snout_braze_back_plane & -snout_back_plane)
+    
+    target_flange_inner_region = ((-snout_inner_cylinder & +snout_back_plane & -target_flange_inner_front_plane)
+                                    | (-target_flange_inner_cylinder & +target_flange_inner_front_plane & -target_flange_inner_back_plane)
+                                    | (-snout_inner_cylinder & +target_flange_inner_back_plane & -target_flange_back_plane))
+    target_flange_wall_region = ((+snout_inner_cylinder & -target_flange_outer_cylinder & +snout_back_plane & -target_flange_back_plane)
+                                    | (+target_flange_inner_cylinder & -target_flange_outer_cylinder & +target_flange_inner_front_plane & -target_flange_inner_back_plane)
+                                    | (+snout_inner_cylinder & -target_flange_outer_cylinder & +target_flange_inner_back_plane & -target_flange_back_plane))
+    
+    fnert_face_seal_inner_region = -fnert_face_seal_inner_cylinder & +target_flange_back_plane & -fnert_face_seal_back_plane
+    fnert_face_seal_wall_region = +fnert_face_seal_inner_cylinder & -fnert_face_seal_outer_cylinder & +target_flange_back_plane & -fnert_face_seal_back_plane
+
+    main_tube_inner_region = -main_tube_inner_cylinder & +fnert_face_seal_back_plane & -main_tube_back_plane
+    main_tube_wall_region = +main_tube_inner_cylinder & -main_tube_outer_cylinder & +fnert_face_seal_back_plane & -main_tube_back_plane
+
+    ngen_region = (-snout_outer_cylinder & +coolant_plug_front_plane & -thin_copper_plug_front_plane & -coolant_plug_cutoff_plane) | \
+                         (-snout_outer_cylinder & +thin_copper_plug_front_plane & -thin_copper_plug_middle_plane) | \
+                        (-snout_braze_cylinder & +thin_copper_plug_middle_plane & -snout_braze_back_plane) | \
+                        (-snout_outer_cylinder & +snout_braze_back_plane & -snout_back_plane) | \
+                        (-target_flange_outer_cylinder & +snout_back_plane & -target_flange_back_plane) | \
+                        (-fnert_face_seal_outer_cylinder & +target_flange_back_plane & -fnert_face_seal_back_plane) | \
+                        (-main_tube_outer_cylinder & +fnert_face_seal_back_plane & -main_tube_back_plane) | \
+                        inlet_ptc_overall_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False) | \
+                        outlet_ptc_overall_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False)
 
     foil_ring_region_1 = +foil_ring_inner_cyl & -foil_ring_outer_cyl & \
                             +foil_ring_bottom_plane & -foil_ring_top_plane & \
@@ -758,10 +964,166 @@ def create_experiment_model(foil_angles=None,
     wood.add_element('Ca', 0.000388)
     wood.set_density('g/cm3', 0.64)
 
+    # polyethylene
+    polyethylene = openmc.Material(name='Polyethylene')
+    polyethylene.add_element('C', 1/3)
+    polyethylene.add_element('H', 2/3)
+    polyethylene.set_density('g/cm3', 0.93)
 
-    ngen_cell = openmc.Cell(region=ngen_region,
-                           fill=None,
-                           name='Neutron Generator Cell')
+    # fluorinert (FC-40)
+    # don't know exact fluorinert composition, but assume that its FC-40 with composition from
+    # https://pubchem.ncbi.nlm.nih.gov/compound/Fluorinert-FC-40
+    # and density from:
+    # https://www.3m.com/3M/en_US/company-us/all-3m-products/~/3M-Fluorinert-Fluid-FC-40/?N=5002385+3294529207&rt=rud
+
+    fluorinert = openmc.Material(name='Fluorinert')
+    fluorinert.add_element('C', 21/71)
+    fluorinert.add_element('F', 48/71)
+    fluorinert.add_element('N', 2/71)
+    fluorinert.set_density('g/cm3', 1.9)
+
+    # air from PNNL Materials Compendium, with density at STP
+    air = openmc.Material(name='Air')
+    air.add_element('C', 0.000150)
+    air.add_element('N', 0.784429)
+    air.add_element('O', 0.210750)
+    air.add_element('Ar', 0.004671)
+    air.set_density('g/cm3', 0.001205)
+
+
+    # mix of fluorinert and polyethylene to approximate the flourinert plastic mix used in the main tube
+    # supposedly there is 930 mL of plastic and 1500 mL of fluorinert, so use those volumes to calculate the mass fractions
+    # so fill the remaining 1274 mL of mixture in main tube with air
+
+    fluorinert_plastic_mix = openmc.Material(name='Fluorinert Plastic Mix').mix_materials(
+        [fluorinert, polyethylene, air],
+        [1500/(1500 + 930 + 1274), 930/(1500 + 930 + 1274), 1274/(1500 + 930 + 1274)],
+        percent_type='vo'
+    )
+    print("Fluorinert Plastic Mix density:", fluorinert_plastic_mix.get_mass_density())
+
+    # from PNNL Materials Compendium Aluminum, alloy 6061-O
+    # just a guess that this is the aluminum alloy used in the nGen main tube
+    aluminum6061 = openmc.Material(name='Aluminum 6061')
+    aluminum6061.add_element('Al', 0.972, 'wo')
+    aluminum6061.add_element('Mg', 0.010, 'wo')
+    aluminum6061.add_element('Si', 0.006, 'wo')
+    aluminum6061.add_element('Ti', 0.000876, 'wo')
+    aluminum6061.add_element('Cr', 0.001950, 'wo')
+    aluminum6061.add_element('Mn', 0.000876, 'wo')
+    aluminum6061.add_element('Fe', 0.004088, 'wo')
+    aluminum6061.add_element('Cu', 0.002750, 'wo')
+    aluminum6061.add_element('Zn', 0.001460, 'wo')
+    aluminum6061.set_density('g/cm3', 2.70)
+
+    # kovar (ASTM F15)
+    # element composition and density from https://www.aircraftmaterials.com/data/nickel/kovar.html
+    # with half of max values used for C, Mn, Al, Cr, Mg, Zr, Ti, Cu, Mo
+    kovar = openmc.Material(name='Kovar')
+    kovar.add_element('Fe', 0.53, 'wo')
+    kovar.add_element('Ni', 0.29, 'wo')
+    kovar.add_element('Co', 0.17, 'wo')
+    kovar.add_element('C', 0.0002, 'wo')
+    kovar.add_element('Mn', 0.0025, 'wo')
+    kovar.add_element('Si', 0.0020, 'wo')
+    kovar.add_element('Al', 0.0005, 'wo')
+    kovar.add_element('Cr', 0.0010, 'wo')
+    kovar.add_element('Mg', 0.0005, 'wo')
+    kovar.add_element('Zr', 0.0005, 'wo')
+    kovar.add_element('Ti', 0.0005, 'wo')
+    kovar.add_element('Cu', 0.0010, 'wo')
+    kovar.add_element('Mo', 0.0010, 'wo')
+    kovar.set_density('g/cm3', 8.36)
+
+    ss316 = openmc.Material(name="stainless_316")
+    ss316.set_density('g/cm3', 8.0)
+    ss316.add_element('C',  0.000800, 'wo')
+    ss316.add_element('Mn', 0.020000, 'wo')
+    ss316.add_element('P',  0.000450, 'wo')
+    ss316.add_element('S',  0.000300, 'wo')
+    ss316.add_element('Si', 0.010000, 'wo')
+    ss316.add_element('Cr', 0.170000, 'wo')
+    ss316.add_element('Ni', 0.120000, 'wo')
+    ss316.add_element('Mo', 0.025000, 'wo')
+    ss316.add_element('Fe', 0.653450, 'wo')
+
+    water = openmc.Material(name='Water')
+    water.add_element('H', 2/3)
+    water.add_element('O', 1/3)
+    water.set_density('g/cm3', 1.0)
+
+    # Reference: PNNL Materials Compendium
+    brass = openmc.Material(name='Brass')
+    brass.add_element('Fe', 0.000992)
+    brass.add_element('Cu', 0.668462)
+    brass.add_element('Zn', 0.318026)
+    brass.add_element('Sn', 0.001437)
+    brass.add_element('P', 0.011083)
+    brass.set_density('g/cm3', 8.07)
+
+    inlet_ptc_plastic_cap_cell = openmc.Cell(region=inlet_ptc_plastic_cap_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+                                            fill=pla,
+                                            name='Inlet PTC Plastic Cap')
+    inlet_ptc_brass_body_cell = openmc.Cell(region=inlet_ptc_brass_body_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+                                            fill=brass,
+                                            name='Inlet PTC Brass Body')
+    inlet_ptc_water_cell = openmc.Cell(region=inlet_ptc_water_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+                                            fill=water,
+                                            name='Inlet PTC Water')
+    outlet_ptc_plastic_cap_cell = openmc.Cell(region=outlet_ptc_plastic_cap_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+                                            fill=pla,
+                                            name='Outlet PTC Plastic Cap')
+    outlet_ptc_brass_body_cell = openmc.Cell(region=outlet_ptc_brass_body_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+                                            fill=brass,
+                                            name='Outlet PTC Brass Body')
+    outlet_ptc_water_cell = openmc.Cell(region=outlet_ptc_water_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+                                            fill=water,
+                                            name='Outlet PTC Water')
+
+    coolant_plug_cell = openmc.Cell(region=coolant_plug_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+                                    fill=copper,
+                                    name='Coolant Plug')
+    coolant_cell = openmc.Cell(region=coolant_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+                                    fill=water,
+                                    name='Coolant Inlet 1')
+    thin_copper_plug_cell = openmc.Cell(region=thin_copper_plug_region,
+                                    fill=copper,
+                                    name='Thin Copper Plug')
+    target_cell = openmc.Cell(region=target_region,
+                              fill=titanium,
+                              name='Target')
+    snout_inner_cell = openmc.Cell(region=snout_inner_region,
+                                   fill=None,
+                                      name='Snout Inner')
+    snout_wall_cell = openmc.Cell(region=snout_wall_region,
+                                  fill=kovar,
+                                  name='Snout Wall')
+    target_flange_inner_cell = openmc.Cell(region=target_flange_inner_region,
+                                           fill=None,
+                                             name='Target Flange Inner')
+    target_flange_wall_cell = openmc.Cell(region=target_flange_wall_region,
+                                           fill=kovar,
+                                             name='Target Flange Wall')
+    fnert_face_seal_inner_cell = openmc.Cell(region=fnert_face_seal_inner_region,
+                                             fill=None,
+                                             name='FNERT Face Seal Inner')
+    fnert_face_seal_wall_cell = openmc.Cell(region=fnert_face_seal_wall_region,
+                                            fill=ss316,
+                                             name='FNERT Face Seal Wall')
+    main_tube_inner_cell = openmc.Cell(region=main_tube_inner_region,
+                                      fill=fluorinert_plastic_mix,
+                                      name='Main Tube Inner')
+    main_tube_wall_cell = openmc.Cell(region=main_tube_wall_region,
+                                     fill=aluminum6061,
+                                      name='Main Tube Wall')
+
+    ngen_cells = [inlet_ptc_plastic_cap_cell, inlet_ptc_brass_body_cell, inlet_ptc_water_cell,
+                  outlet_ptc_plastic_cap_cell, outlet_ptc_brass_body_cell, outlet_ptc_water_cell,
+                  coolant_plug_cell, coolant_cell, thin_copper_plug_cell, target_cell,
+                  snout_inner_cell, snout_wall_cell,
+                 target_flange_inner_cell, target_flange_wall_cell, fnert_face_seal_inner_cell,
+                 fnert_face_seal_wall_cell, main_tube_inner_cell, main_tube_wall_cell]
+    
     foil_ring_cell = openmc.Cell(region=foil_ring_region,
                            fill=pla,
                            name='Foil Ring Cell')
@@ -770,9 +1132,9 @@ def create_experiment_model(foil_angles=None,
                            name='Table Cell')
     
     air_cell = openmc.Cell(region=bounding_region,
-                           fill=None,
+                           fill=air,
                            name='Air Cell')
-    cells = [ngen_cell, foil_ring_cell, table_cell] + diamond_cells + foil_cells + [air_cell]
+    cells = ngen_cells + [foil_ring_cell, table_cell] + diamond_cells + foil_cells + [air_cell]
     # cells = [ngen_cell, foil_ring_cell, table_cell, air_cell]
     universe = openmc.Universe(cells=cells, name='Experiment Universe')
     geometry = openmc.Geometry(universe)
@@ -781,7 +1143,11 @@ def create_experiment_model(foil_angles=None,
     materials = openmc.Materials([niobium, zirconium, pla, wood, diamond,
                                   indium, nickel, iron,
                                   molybdenum, copper, titanium,
-                                  aluminum])
+                                  aluminum,
+                                  aluminum6061, kovar, ss316, 
+                                  fluorinert, polyethylene, 
+                                  fluorinert_plastic_mix, air,
+                                  water, brass])
     if source is None:
         source = openmc.IndependentSource()
         source.space = openmc.stats.Point(source_center)
@@ -819,13 +1185,18 @@ def create_experiment_model(foil_angles=None,
     diamond_tally.filters = [diamond_cells_filter]
     diamond_tally.scores = ['flux', '(n,a)']
 
+    spectrum_tally = openmc.Tally(name='spectrum tally')
+    diamond_energy_filter = openmc.EnergyFilter(np.arange(12.6e6, 15.5e6, 0.0056e6))
+    spectrum_tally.filters = [diamond_cells_filter, diamond_energy_filter]
+    spectrum_tally.scores = ['flux', '(n,a)']
+
+
     irdff_tallies = make_irdff_tallies(foil_cells, energy_groups=irdff_energy_groups)
 
-    tallies = openmc.Tallies([flux_tally, n2n_tally, diamond_tally] + irdff_tallies)
+    tallies = openmc.Tallies([flux_tally, n2n_tally, diamond_tally, spectrum_tally] + irdff_tallies)
     # tallies = openmc.Tallies()
 
     cell_plot_colors = {
-        ngen_cell: 'black',
         foil_ring_cell: 'tan',
         table_cell: 'saddlebrown',
         air_cell: 'white',
@@ -854,6 +1225,13 @@ def create_experiment_model(foil_angles=None,
         titanium: 'cyan',
         molybdenum: 'magenta',
         aluminum: 'silver',
+        aluminum6061: 'lightgray',
+        kovar: 'darkred',
+        ss316: 'darkblue',
+        fluorinert_plastic_mix: 'lightgreen',
+        air: 'azure',
+        water: 'blue',
+        brass: 'darkgoldenrod'
     }
     plot_xy = openmc.Plot()
     plot_xy.basis = 'xy'
@@ -863,8 +1241,8 @@ def create_experiment_model(foil_angles=None,
 
     plot_xy2 = openmc.Plot()
     plot_xy2.basis = 'xy'
-    plot_xy2.origin = np.array(source_center) + np.array([0,0,0.5*2.54+0.1]) # shift up to be centered on the foil ring
-    plot_xy2.width = (40, 40)
+    plot_xy2.origin = np.array(source_center) + np.array([-2.0, -np.sqrt(2)/4*1.143, -np.sqrt(2)/4*1.143]) # shift to be centered on inlet PTC tube
+    plot_xy2.width = (10, 10)
     plot_xy2.pixels = (3000, 3000)
 
     plot_xy3 = openmc.Plot()
@@ -879,14 +1257,26 @@ def create_experiment_model(foil_angles=None,
     plot_xz.width = (50, 50)
     plot_xz.pixels = (4000, 4000)
 
+    plot_xz2 = openmc.Plot()
+    plot_xz2.basis = 'xz'
+    plot_xz2.origin = np.array(source_center) + np.array([0.0, np.sqrt(2)/4*1.143, -np.sqrt(2)/4*1.143]) # shift to be centered on outlet PTC tube
+    plot_xz2.width = (20, 20)
+    plot_xz2.pixels = (3000, 3000)
 
-    for plot in [plot_xy, plot_xy2, plot_xy3, plot_xz]:
+    plot_yz = openmc.Plot()
+    plot_yz.basis = 'yz'
+    plot_yz.origin = source_center + np.array([-1.8, 0, 0]) # shift back to be centered on cooling tip inlet/outlet
+    plot_yz.width = (20, 20)
+    plot_yz.pixels = (3000, 3000)
+
+
+    for plot in [plot_xy, plot_xy2, plot_xy3, plot_xz, plot_xz2, plot_yz]:
         # plot.color_by = 'cell'
         # plot.colors = cell_plot_colors
         plot.color_by = 'material'
         plot.colors = plot_colors
 
-    plots = openmc.Plots([plot_xy, plot_xy2, plot_xy3, plot_xz])
+    plots = openmc.Plots([plot_xy, plot_xy2, plot_xy3, plot_xz, plot_xz2, plot_yz])
 
     model = openmc.Model(
         geometry=geometry,
