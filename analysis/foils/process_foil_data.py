@@ -178,7 +178,8 @@ mo92np = Reaction(reactant=Nuclide("Mo92", atomic_mass=91.9068, abundance=0.1465
                    )
 ni58np = Reaction(reactant=Nuclide("Ni58", atomic_mass=57.9353, abundance=0.6808),
                    product=Nuclide("Co58", atomic_mass=57.9358, 
-                                   energy=[511, 810.76], intensity=[0.30, 0.9945],
+                                #    energy=[511, 810.76], intensity=[0.30, 0.9945],
+                                   energy=[810.76], intensity=[0.9945],
                                    half_life=(70.86 * ureg.day).to(ureg.s).magnitude),
                 #    cross_section=get_multigroup_cross_section("Ni58", mt=103, flux=None)
                     cross_section=get_interpolated_cross_section("Ni58", mt=103, energy=14.08e6),
@@ -696,6 +697,15 @@ def get_xs_from_xs_dict(foil_xs_dict, foil_name, foil):
 
     return reaction_xs_dict
 
+def get_xs_from_xs_dict_no_foil_name(foil_xs_dict, angle, reaction):
+    for name in foil_xs_dict.keys():
+        name_split = name.split('_')
+        reaction_i = name_split[-1]
+        if reaction_i == reaction and name_split[-2] == f"{angle}deg":
+            return foil_xs_dict[name]
+    print(f"No cross section found for angle {angle} and reaction {reaction} in foil_xs_dict with keys: {list(foil_xs_dict.keys())}")
+    return None
+
 def calculate_neutron_rate_from_foil(foil_measurements, 
                                      foil_name,
                                      background_meas,
@@ -703,7 +713,8 @@ def calculate_neutron_rate_from_foil(foil_measurements,
                                      efficiency_coeffs,
                                      search_width=330,
                                      irradiations=irradiations,
-                                     time_generator_off=time_generator_off):
+                                     time_generator_off=time_generator_off,
+                                     plot_spectra=False):
     neutron_rates = {}
     neutron_rate_errs = {}
 
@@ -714,13 +725,24 @@ def calculate_neutron_rate_from_foil(foil_measurements,
 
         for detector in measurement.detectors:
             ch = detector.channel_nb
-
+            if plot_spectra:
+                import matplotlib.pyplot as plt
+                fig, ax = plt.subplots()
+                hist, bin_edges = detector.get_energy_hist_background_substract(
+                    background_detector=background_meas.detectors[ch],
+                    bins=None,
+                    live_or_real="live"
+                )
+                ax.stairs(hist, bin_edges, label=f"{foil_name} Count {count_num} Channel {ch}")
+            else:
+                ax = None
             gamma_emitted, gamma_emitted_err = measurement.get_gamma_emitted(
                 background_measurement=background_meas,
                 calibration_coeffs=calibration_coeffs[ch],
                 efficiency_coeffs=efficiency_coeffs[ch],
                 channel_nb=ch,
-                search_width=search_width)
+                search_width=search_width,
+                ax=ax)
 
             
             neutron_rate = measurement.get_neutron_rate(
@@ -756,6 +778,7 @@ def calculate_neutron_flux_from_foil(foil_measurements,
                                      time_generator_off=time_generator_off,
                                      detector_efficiency=None,
                                      detector_efficiency_err=0.0,
+                                    plot_spectra=False
 ):
     neutron_fluxes = {}
     neutron_flux_errs = {}
@@ -767,6 +790,20 @@ def calculate_neutron_flux_from_foil(foil_measurements,
 
         for detector in measurement.detectors:
             ch = detector.channel_nb
+
+            if plot_spectra:
+                import matplotlib.pyplot as plt
+                fig, ax = plt.subplots()
+                hist, bin_edges = detector.get_energy_hist_background_substract(
+                    background_detector=background_meas.detectors[ch],
+                    bins=None,
+                    live_or_real="live"
+                )
+                calibrated_bin_edges = np.polyval(calibration_coeffs[ch], bin_edges)
+                ax.set_title(f"{foil_name} Count {count_num} Channel {ch}")
+                ax.stairs(hist, calibrated_bin_edges, label=f"Spectrum")
+            else:
+                ax = None
 
             if isinstance(detector_efficiency, dict):
                 det_eff = detector_efficiency[ch]
@@ -784,7 +821,8 @@ def calculate_neutron_flux_from_foil(foil_measurements,
                 channel_nb=ch,
                 search_width=search_width,
                 detection_efficiency=det_eff,
-                detection_efficiency_err=det_eff_err)
+                detection_efficiency_err=det_eff_err,
+                ax=ax)
 
             print(f"Gamma emitted for {foil_name} Count {count_num} Channel {ch}: {gamma_emitted} +/- {gamma_emitted_err}")
             
@@ -808,6 +846,67 @@ def calculate_neutron_flux_from_foil(foil_measurements,
 
     return neutron_fluxes, neutron_flux_errs
 
+def get_correction_factor(measurement, channel_nb, irradiations, 
+                                   time_generator_off, branching_ratio,
+                                   total_efficiency=1.0):
+    # This calculates the C_i factor from Equation 1 of 
+    # "Determination of the Deuterium-Tritium (D-T) Generator Neutron Flux using 
+    # Multi-foil Neutron Activation Analysis Method"
+    # by D. Lee, B. Bucher, K. Krebs, E. Seabury, J. Wharton, July 2019
+    # https://www.osti.gov/servlets/purl/1524045
+    time_between_generator_off_and_start_of_counting = (
+            measurement.start_time - time_generator_off
+        ).total_seconds()
+
+    detector = measurement.get_detector(channel_nb)
+
+    f_time = (
+        get_chain(irradiations, measurement.foil.reaction.product.decay_constant)
+        * np.exp(
+            -measurement.foil.reaction.product.decay_constant
+            * time_between_generator_off_and_start_of_counting
+        )
+        * (
+            1
+            - np.exp(
+                -measurement.foil.reaction.product.decay_constant
+                * detector.real_count_time
+            )
+        )
+        * (detector.live_count_time / detector.real_count_time)
+        / measurement.foil.reaction.product.decay_constant
+    )
+
+    # Correction factor of gamma-ray self-attenuation in the foil
+    if measurement.foil.thickness is None:
+        f_self = 1
+    else:
+        f_self = (
+            1
+            - np.exp(
+                -measurement.foil.mass_attenuation_coefficient
+                * measurement.foil.density
+                * measurement.foil.thickness
+            )
+        ) / (
+            measurement.foil.mass_attenuation_coefficient
+            * measurement.foil.density
+            * measurement.foil.thickness
+        )
+
+    # Spectroscopic Factor to account for the branching ratio and the
+    # total detection efficiency
+    # total efficiency is by default 1 because efficiency is already accounted for in the get_gamma_emitted method, 
+    # but can be included here if there are additional efficiency factors to consider
+    # print("total efficiency:", total_efficiency)
+    # print("branching ratio:", branching_ratio)
+    f_spec = total_efficiency * np.array(branching_ratio)
+
+
+    C = measurement.foil.nb_atoms * f_time * f_self * f_spec
+
+    return C
+
 
 def calculate_neutron_flux_from_foil_with_xs(foil_measurements, 
                                      foil_name,
@@ -821,23 +920,34 @@ def calculate_neutron_flux_from_foil_with_xs(foil_measurements,
                                      detector_efficiency_err=0.0):
     neutron_fluxes = {}
     neutron_flux_errs = {}
+    gamma_emitted_dict = {}
+    gamma_emitted_err_dict = {}
+    factors_dict = {}
+    reactions_dict = {}
 
     for count_num, measurement in foil_measurements[foil_name]["measurements"].items():
 
         neutron_fluxes[f"Count {count_num}"] = {}
         neutron_flux_errs[f"Count {count_num}"] = {}
-
+        gamma_emitted_dict[f"Count {count_num}"] = {}
+        gamma_emitted_err_dict[f"Count {count_num}"] = {}
+        factors_dict[f"Count {count_num}"] = {}
+        reactions_dict[f"Count {count_num}"] = {}
         # Get cross section for the foil reaction from the processed_data.json file
         foil_xs_dict = read_foil_xs_from_processed_data()
-        print('foil_xs_dict:', foil_xs_dict)
+        # print('foil_xs_dict:', foil_xs_dict)
         xs_dict = get_xs_from_xs_dict(foil_xs_dict, foil_name, foil_measurements[foil_name]["foil"])
-        print('xs_dict:', xs_dict)
+        # print('xs_dict:', xs_dict)
 
         for reaction, xs in xs_dict.items():
             # Set the cross section for the foil reaction in the ActivationFoil object
             foil_measurements[foil_name]["foil"].reaction.cross_section = xs
             neutron_fluxes[f"Count {count_num}"][reaction] = {}
             neutron_flux_errs[f"Count {count_num}"][reaction] = {}
+            gamma_emitted_dict[f"Count {count_num}"][reaction] = {}
+            gamma_emitted_err_dict[f"Count {count_num}"][reaction] = {}
+            factors_dict[f"Count {count_num}"][reaction] = {}
+            reactions_dict[f"Count {count_num}"][reaction] = reaction
 
             for detector in measurement.detectors:
                 ch = detector.channel_nb
@@ -860,7 +970,8 @@ def calculate_neutron_flux_from_foil_with_xs(foil_measurements,
                     detection_efficiency=det_eff,
                     detection_efficiency_err=det_eff_err)
 
-                print(f"Gamma emitted for {foil_name} Count {count_num} Channel {ch}: {gamma_emitted} +/- {gamma_emitted_err}")
+
+                # print(f"Gamma emitted for {foil_name} Count {count_num} Channel {ch}: {gamma_emitted} +/- {gamma_emitted_err}")
                 print("cross section for foil reaction:", foil_measurements[foil_name]["foil"].reaction.cross_section, "cm^2")
                 
                 neutron_flux = measurement.get_neutron_flux(
@@ -878,10 +989,17 @@ def calculate_neutron_flux_from_foil_with_xs(foil_measurements,
                     time_generator_off=time_generator_off,
                     branching_ratio=foil_measurements[foil_name]["foil"].reaction.product.intensity
                 )
+
+                factor = get_correction_factor(measurement, ch, irradiations, time_generator_off,
+                                   branching_ratio=foil_measurements[foil_name]["foil"].reaction.product.intensity)
+                
                 neutron_fluxes[f"Count {count_num}"][reaction][ch] = neutron_flux
                 neutron_flux_errs[f"Count {count_num}"][reaction][ch] = neutron_flux_err
+                gamma_emitted_dict[f"Count {count_num}"][reaction][ch] = gamma_emitted
+                gamma_emitted_err_dict[f"Count {count_num}"][reaction][ch] = gamma_emitted_err
+                factors_dict[f"Count {count_num}"][reaction][ch] = factor
 
-    return neutron_fluxes, neutron_flux_errs
+    return neutron_fluxes, neutron_flux_errs, gamma_emitted_dict, gamma_emitted_err_dict, factors_dict
 
 
 def calculate_and_save_gamma_emitted(foil_measurements, 
@@ -974,8 +1092,8 @@ def calculate_and_save_gamma_emitted(foil_measurements,
                 err = float(gamma_emitted_err[i]) if i < len(gamma_emitted_err) else 0.0
                 temp_storage[key].append((val, err))
 
-                print(f"Gamma emitted for {foil_name} ({reaction_name}) Count {count_num} Channel {ch} "
-                      f"@ {gamma_energy:.2f} keV: {val:.2f} +/- {err:.2f}")
+                # print(f"Gamma emitted for {foil_name} ({reaction_name}) Count {count_num} Channel {ch} "
+                    #   f"@ {gamma_energy:.2f} keV: {val:.2f} +/- {err:.2f}")
 
     # Average across counts using inverse variance weighting
     gamma_emitted_dict = {}
@@ -1005,8 +1123,8 @@ def calculate_and_save_gamma_emitted(foil_measurements,
             "n_counts": len(values_list)
         }
         
-        print(f"Averaged gamma emitted for {foil_name} ({reaction_name}) Channel {ch} "
-              f"@ {energy_key}: {avg_value:.2f} +/- {avg_error:.2f} (n={len(values_list)})")
+        # print(f"Averaged gamma emitted for {foil_name} ({reaction_name}) Channel {ch} "
+            #   f"@ {energy_key}: {avg_value:.2f} +/- {avg_error:.2f} (n={len(values_list)})")
 
     # Save to processed_data.json
     save_gamma_emitted_to_processed_data(gamma_emitted_dict, json_path)
@@ -1099,8 +1217,8 @@ def calculate_and_save_all_gamma_emitted(foil_measurements,
                     err = float(gamma_emitted_err[i]) if i < len(gamma_emitted_err) else 0.0
                     temp_storage[key].append((val, err))
 
-                    print(f"Gamma emitted for {foil_name} ({reaction_name}) Count {count_num} Channel {ch} "
-                          f"@ {gamma_energy:.2f} keV: {val:.2f} +/- {err:.2f}")
+                    # print(f"Gamma emitted for {foil_name} ({reaction_name}) Count {count_num} Channel {ch} "
+                        #   f"@ {gamma_energy:.2f} keV: {val:.2f} +/- {err:.2f}")
         
         # Average across counts for this foil
         if foil_name not in all_gamma_emitted:
@@ -1129,8 +1247,8 @@ def calculate_and_save_all_gamma_emitted(foil_measurements,
                 "n_counts": len(values_list)
             }
             
-            print(f"Averaged gamma emitted for {foil_name} ({reaction_name}) Channel {ch} "
-                  f"@ {energy_key}: {avg_value:.2f} +/- {avg_error:.2f} (n={len(values_list)})")
+            # print(f"Averaged gamma emitted for {foil_name} ({reaction_name}) Channel {ch} "
+                #   f"@ {energy_key}: {avg_value:.2f} +/- {avg_error:.2f} (n={len(values_list)})")
     
     # Save all to processed_data.json
     save_gamma_emitted_to_processed_data(all_gamma_emitted, json_path)
@@ -1183,7 +1301,7 @@ def save_gamma_emitted_to_processed_data(gamma_emitted_dict, json_path=None):
     with open(json_path, 'w') as f:
         json.dump(processed_data, f, indent=4)
     
-    print(f"Saved gamma emitted data for {len(gamma_emitted_dict)} foils to {json_path}")
+    # print(f"Saved gamma emitted data for {len(gamma_emitted_dict)} foils to {json_path}")
 
 
 def read_gamma_emitted_from_processed_data(json_path=None):
@@ -1371,6 +1489,60 @@ def build_response_matrix(foil_measurements_list,
         reaction_labels.append(f"{foil_name}_{reaction_name}")
     
     return A, reaction_labels
+
+
+
+def build_response_matrix_from_processed_data(angle, processed_data_json_filepath='../../data/processed_data.json'):
+
+    with open(processed_data_json_filepath, 'r') as f:
+        processed_data = json.load(f)
+
+    foil_xs_dict = read_foil_xs_from_processed_data()
+    responses = []
+    responses_err = []
+    response_matrix = []
+
+    for detector_type in processed_data['foils']:
+        for nuclide in processed_data['foils'][detector_type]:
+            # print("processed_data['foils'][detector_type][nuclide].keys():", list(processed_data['foils'][detector_type][nuclide].keys()))
+            if str(angle) in processed_data['foils'][detector_type][nuclide].keys():
+                # if angle is present as a key without any sign change, use that
+                angle_key = str(angle)
+                xs_angle = angle
+            elif str(-angle) in processed_data['foils'][detector_type][nuclide].keys():
+                # if angle is only present as a key with a sign change, use that (e.g. -90 degrees is present but not 90 degrees for angle=90)
+                angle_key = str(-angle)
+                xs_angle = -angle
+            else:
+                continue  # skip if neither angle nor -angle is present as a key
+            for reaction in processed_data['foils'][detector_type][nuclide][angle_key]['reactions']:
+                # print(processed_data['foils'][detector_type][nuclide][angle_key]['reactions'][reaction])
+                gamma_emitted = processed_data['foils'][detector_type][nuclide][angle_key]['reactions'][reaction]['gamma_emitted']
+                gamma_emitted_err = processed_data['foils'][detector_type][nuclide][angle_key]['reactions'][reaction]['gamma_emitted_err']
+                factors = processed_data['foils'][detector_type][nuclide][angle_key]['reactions'][reaction]['factors']
+                number_of_measurements = processed_data['foils'][detector_type][nuclide][angle_key]['number_of_measurements']
+                xs = get_xs_from_xs_dict_no_foil_name(foil_xs_dict, xs_angle, reaction)
+                print("xs for reaction", reaction, "at angle", angle, "degrees:", xs, "cm^2")
+
+                if len(gamma_emitted) == number_of_measurements:
+                    # response is the number of gammas emitted divided by the correction factors,
+                    # which should equal the flux times the cross section summed over all energy groups (i.e. the reaction rate)
+                    response = np.array(gamma_emitted) / np.array(factors)
+                    response_err = np.array(gamma_emitted_err) / np.array(factors)  # Propagate error through division assuming no error in factors for simplicity
+                else:
+                    pass
+                    # raise ValueError(f"Length of gamma_emitted ({len(gamma_emitted)}) does not match number_of_measurements ({number_of_measurements}) for {nuclide} at angle {angle} degrees")
+                
+                responses.append(np.mean(response).squeeze())  # Use mean response across measurements for this reaction
+                responses_err.append(np.sqrt(np.sum(response_err**2)/len(response_err)).squeeze())  # Use mean error across measurements for this reaction
+                # append xs as new row in response matrix for this reaction
+                response_matrix.append(xs)
+    
+    responses = np.array(responses)
+    responses_err = np.array(responses_err)
+    response_matrix = np.array(response_matrix)
+    return response_matrix, responses, responses_err
+
 
 
 def solve_flux_spectrum(R, R_err, A, energy_groups, regularization=0.0):

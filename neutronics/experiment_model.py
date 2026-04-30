@@ -5,6 +5,7 @@ import numpy as np
 from process_irdff import process_irdff
 from pathlib import Path
 import os
+from libra_toolbox.neutronics.vault import build_vault_model
 
 niobium = openmc.Material(name='Niobium')
 niobium.add_element('Nb', 1.0)
@@ -485,7 +486,7 @@ def get_xs_from_tallies(statepoint_path: Path, foil_cell_volumes: dict, json_pat
                 flux = flux_data[flux_index]
             flux = np.atleast_1d(flux)  # ensure flux is at least 1D
             reaction_rate = np.atleast_1d(reaction_rate)  # ensure reaction_rate is at least 1D
-            # flux *= foil_cell_volumes[cell_name]
+            # flux /= foil_cell_volumes[cell_name]
 
             # get nuclide fraction
             material = all_cells[cell_id].fill
@@ -784,11 +785,12 @@ def create_experiment_model(foil_angles=None,
     table_front_plane = openmc.XPlane(x0=source_center[0] - 10.0)
     table_back_plane = openmc.XPlane(x0=source_center[0] + 50.0)
 
+    # put z_min bottom at 1 cm above vault floor
     bounding_rpp = openmc.model.RectangularParallelepiped(
         xmin=source_center[0] - 100.0, xmax=source_center[0] + 100.0,
         ymin=source_center[1] - 100.0, ymax=source_center[1] + 100.0,
-        zmin=source_center[2] - 100.0, zmax=source_center[2] + 100.0,
-        boundary_type='vacuum'
+        zmin=source_center[2] - (90.5 + (11/16*2.54) + 3 * 2.54 + 19), zmax=source_center[2] + 100.0,
+        boundary_type='transmission'
     )
 
     hole_cylinder = openmc.XCylinder(r=0.5, y0=source_center[1], z0=source_center[2])
@@ -830,15 +832,16 @@ def create_experiment_model(foil_angles=None,
                             | (-coolant_plug_outlet_frustum)
 
     
-    coolant_inlet_region = -coolant_plug_inlet_frustum | (+coolant_plug_inlet_frustum.plane_top & -coolant_plug_plane2 & -coolant_plug_inlet_cylinder2)
-    coolant_outlet_region = -coolant_plug_outlet_frustum | (+coolant_plug_outlet_frustum.plane_top & -coolant_plug_plane2 & -coolant_plug_outlet_cylinder2)
+    coolant_inlet_region = (-inlet_ptc_cylinder1 & +coolant_plug_inlet_frustum.plane_bottom & -coolant_plug_inlet_frustum.plane_top) | (+coolant_plug_inlet_frustum.plane_top & -coolant_plug_plane2 & -coolant_plug_inlet_cylinder2)
+    coolant_outlet_region = (-outlet_ptc_cylinder1 & +coolant_plug_outlet_frustum.plane_bottom & -coolant_plug_outlet_frustum.plane_top) | (+coolant_plug_outlet_frustum.plane_top & -coolant_plug_plane2 & -coolant_plug_outlet_cylinder2)
     coolant_flow_region = (-coolant_plug_flow_cylinder & -coolant_plug_inlet_cylinder2) \
                         | (-coolant_plug_flow_cylinder & -coolant_plug_outlet_cylinder2) \
                         | (-coolant_plug_flow_cylinder & +coolant_plug_flow_yplane2 & -coolant_plug_flow_yplane1 & +coolant_plug_inlet_cylinder2 & +coolant_plug_outlet_cylinder2)
     coolant_region = coolant_inlet_region | coolant_outlet_region | coolant_flow_region
-    coolant_plug_region = -snout_outer_cylinder & +coolant_plug_front_plane & -thin_copper_plug_front_plane & ~coolant_region & -coolant_plug_cutoff_plane
+    coolant_plug_region = -snout_outer_cylinder & +coolant_plug_front_plane & -thin_copper_plug_front_plane & ~coolant_region & -coolant_plug_cutoff_plane & ~inlet_ptc_overall_region & ~outlet_ptc_overall_region
 
     coolant_plug_rotation = (-45, 0, 0)  # rotate 45 degrees around x-axis
+    # coolant_plug_rotation = (0, 0, 0)  # no rotation
     coolant_plug_pivot = (source_center[0], source_center[1], source_center[2])  # rotate around the source center
 
     # for region in [inlet_ptc_plastic_cap_region, inlet_ptc_brass_body_region, inlet_ptc_water_region, inlet_ptc_overall_region,
@@ -850,7 +853,7 @@ def create_experiment_model(foil_angles=None,
 
     thin_copper_plug_region = (-snout_outer_cylinder & +thin_copper_plug_front_plane & -thin_copper_plug_middle_plane) \
                             | (-thin_copper_plug_inner_cylinder & +thin_copper_plug_middle_plane & -thin_copper_plug_back_plane)
-    target_region = -snout_inner_cylinder & +thin_copper_plug_back_plane & -target_back_plane
+    target_region = -target_cylinder & +thin_copper_plug_back_plane & -target_back_plane
 
     snout_inner_region = (-snout_inner_cylinder & +target_back_plane & -snout_back_plane) \
                         | (-snout_inner_cylinder & +target_cylinder & -target_back_plane & +thin_copper_plug_back_plane) \
@@ -861,7 +864,7 @@ def create_experiment_model(foil_angles=None,
     target_flange_inner_region = ((-snout_inner_cylinder & +snout_back_plane & -target_flange_inner_front_plane)
                                     | (-target_flange_inner_cylinder & +target_flange_inner_front_plane & -target_flange_inner_back_plane)
                                     | (-snout_inner_cylinder & +target_flange_inner_back_plane & -target_flange_back_plane))
-    target_flange_wall_region = ((+snout_inner_cylinder & -target_flange_outer_cylinder & +snout_back_plane & -target_flange_back_plane)
+    target_flange_wall_region = ((+snout_inner_cylinder & -target_flange_outer_cylinder & +snout_back_plane & -target_flange_inner_front_plane)
                                     | (+target_flange_inner_cylinder & -target_flange_outer_cylinder & +target_flange_inner_front_plane & -target_flange_inner_back_plane)
                                     | (+snout_inner_cylinder & -target_flange_outer_cylinder & +target_flange_inner_back_plane & -target_flange_back_plane))
     
@@ -878,8 +881,8 @@ def create_experiment_model(foil_angles=None,
                         (-target_flange_outer_cylinder & +snout_back_plane & -target_flange_back_plane) | \
                         (-fnert_face_seal_outer_cylinder & +target_flange_back_plane & -fnert_face_seal_back_plane) | \
                         (-main_tube_outer_cylinder & +fnert_face_seal_back_plane & -main_tube_back_plane) | \
-                        inlet_ptc_overall_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False) | \
-                        outlet_ptc_overall_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False)
+                        inlet_ptc_overall_region | \
+                        outlet_ptc_overall_region
 
     foil_ring_region_1 = +foil_ring_inner_cyl & -foil_ring_outer_cyl & \
                             +foil_ring_bottom_plane & -foil_ring_top_plane & \
@@ -933,8 +936,9 @@ def create_experiment_model(foil_angles=None,
 
     diamond_cells, diamond_regions = create_diamond(diamond_angles, diamond_distances, source_center)
 
+    rotated_ngen_region = ngen_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot)
     bounding_region = -bounding_rpp \
-                       & ~ngen_region \
+                       & ~rotated_ngen_region \
                        & ~foil_ring_region \
                        & ~table_region
     for foil_region in foil_regions:
@@ -1083,9 +1087,18 @@ def create_experiment_model(foil_angles=None,
     coolant_plug_cell = openmc.Cell(region=coolant_plug_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
                                     fill=copper,
                                     name='Coolant Plug')
+    # coolant_inlet_cell = openmc.Cell(region=coolant_inlet_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+    #                                  fill=water,
+    #                                  name='Coolant Inlet')
+    # coolant_outlet_cell = openmc.Cell(region=coolant_outlet_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+    #                                  fill=water,
+    #                                  name='Coolant Outlet')
+    # coolant_flow_cell = openmc.Cell(region=coolant_flow_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
+    #                                  fill=water,
+    #                                  name='Coolant Flow')
     coolant_cell = openmc.Cell(region=coolant_region.rotate(coolant_plug_rotation, pivot=coolant_plug_pivot, inplace=False),
                                     fill=water,
-                                    name='Coolant Inlet 1')
+                                    name='Coolant')
     thin_copper_plug_cell = openmc.Cell(region=thin_copper_plug_region,
                                     fill=copper,
                                     name='Thin Copper Plug')
@@ -1119,10 +1132,13 @@ def create_experiment_model(foil_angles=None,
 
     ngen_cells = [inlet_ptc_plastic_cap_cell, inlet_ptc_brass_body_cell, inlet_ptc_water_cell,
                   outlet_ptc_plastic_cap_cell, outlet_ptc_brass_body_cell, outlet_ptc_water_cell,
-                  coolant_plug_cell, coolant_cell, thin_copper_plug_cell, target_cell,
+                  coolant_plug_cell,
+                #   coolant_inlet_cell, coolant_outlet_cell, coolant_flow_cell,
+                  coolant_cell,
+                  thin_copper_plug_cell, target_cell,
                   snout_inner_cell, snout_wall_cell,
-                 target_flange_inner_cell, target_flange_wall_cell, fnert_face_seal_inner_cell,
-                 fnert_face_seal_wall_cell, main_tube_inner_cell, main_tube_wall_cell]
+                  target_flange_inner_cell, target_flange_wall_cell, fnert_face_seal_inner_cell,
+                  fnert_face_seal_wall_cell, main_tube_inner_cell, main_tube_wall_cell]
     
     foil_ring_cell = openmc.Cell(region=foil_ring_region,
                            fill=pla,
@@ -1161,12 +1177,18 @@ def create_experiment_model(foil_angles=None,
                                                 [dd_dt_ratio, 1-dd_dt_ratio])
         source.particle = 'neutron'
 
+    volume_calc = openmc.VolumeCalculation(domains=foil_cells, samples=int(1e9),
+                                            lower_left=np.array(source_center) - np.array([20.0, 20.0, 20.0]), 
+                                            upper_right=np.array(source_center) + np.array([20.0, 20.0, 20.0]))
+
     settings = openmc.Settings()
     settings.batches = 100
     settings.inactive = 0
     settings.particles = int(num_particles_per_batch)
     settings.run_mode = 'fixed source'
     settings.source = source
+    settings.volume_calculations = volume_calc
+    settings.verbosity = 7
 
 
     foil_cell_filter = openmc.CellFilter(foil_cells)
@@ -1190,10 +1212,16 @@ def create_experiment_model(foil_angles=None,
     spectrum_tally.filters = [diamond_cells_filter, diamond_energy_filter]
     spectrum_tally.scores = ['flux', '(n,a)']
 
+    foil_spectrum_tally = openmc.Tally(name='foil spectrum tally')
+    foil_energy_filter = openmc.EnergyFilter(openmc.mgxs.GROUP_STRUCTURES["CCFE-709"])
+    # foil_spectrum_tally.filters = [foil_cell_filter, foil_energy_filter]
+    foil_spectrum_tally.filters = [foil_cell_filter, diamond_energy_filter]
+    foil_spectrum_tally.scores = ['flux']
+
 
     irdff_tallies = make_irdff_tallies(foil_cells, energy_groups=irdff_energy_groups)
 
-    tallies = openmc.Tallies([flux_tally, n2n_tally, diamond_tally, spectrum_tally] + irdff_tallies)
+    tallies = openmc.Tallies([flux_tally, n2n_tally, diamond_tally, spectrum_tally, foil_spectrum_tally] + irdff_tallies)
     # tallies = openmc.Tallies()
 
     cell_plot_colors = {
@@ -1251,6 +1279,12 @@ def create_experiment_model(foil_angles=None,
     plot_xy3.width = (40, 40)
     plot_xy3.pixels = (3000, 3000)
 
+    plot_xy4 = openmc.Plot()
+    plot_xy4.basis = 'xy'
+    plot_xy4.origin = np.array(source_center)
+    plot_xy4.width = (2000, 1000)
+    plot_xy4.pixels = (3000, 1500)
+
     plot_xz = openmc.Plot()
     plot_xz.basis = 'xz'
     plot_xz.origin = source_center
@@ -1270,21 +1304,30 @@ def create_experiment_model(foil_angles=None,
     plot_yz.pixels = (3000, 3000)
 
 
-    for plot in [plot_xy, plot_xy2, plot_xy3, plot_xz, plot_xz2, plot_yz]:
+    for plot in [plot_xy, plot_xy2, plot_xy3, plot_xy4, plot_xz, plot_xz2, plot_yz]:
         # plot.color_by = 'cell'
         # plot.colors = cell_plot_colors
         plot.color_by = 'material'
         plot.colors = plot_colors
 
-    plots = openmc.Plots([plot_xy, plot_xy2, plot_xy3, plot_xz, plot_xz2, plot_yz])
+    plots = openmc.Plots([plot_xy, plot_xy2, plot_xy3, plot_xy4, plot_xz, plot_xz2, plot_yz])
 
-    model = openmc.Model(
-        geometry=geometry,
-        materials=materials,
+    model = build_vault_model(
         settings=settings,
         tallies=tallies,
-        plots=plots
+        added_cells=cells,
+        added_materials=materials,
+        overall_exclusion_region=-bounding_rpp,
+        download_cross_sections=False,
     )
+    model.plots = plots
+    # model = openmc.Model(
+    #     geometry=geometry,
+    #     materials=materials,
+    #     settings=settings,
+    #     tallies=tallies,
+    #     plots=plots
+    # )
 
     return model, foil_cell_volumes
 

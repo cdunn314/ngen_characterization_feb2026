@@ -26,7 +26,12 @@ sys.path.append(str(Path(__file__).parent / '../analysis/foils'))
 sys.path.append(str(Path(__file__).parent / '../analysis/diamond'))
 sys.path.append(str(Path(__file__).parent / '../neutronics'))
 from neutron_source import nGen_generator
-from experiment_model import create_experiment_model, get_xs_from_tallies, get_diamond_n_alpha_rates
+from experiment_model import (create_experiment_model, 
+                              get_xs_from_tallies,
+                              get_diamond_n_alpha_rates,
+                              ELEMENT_SYMBOLS
+)
+# from process_foil_data import build_response_matrix_from_processed_data, solve_flux_spectrum
 
 def run_notebook(notebook_path: Path):
     """Run a Jupyter notebook using nbconvert."""
@@ -247,7 +252,7 @@ def plot_diamond_and_foil_yields(json_path=None, statepoint_path=None, output_di
     with open(json_path, 'r') as f:
         processed_data = json.load(f)
     
-    fig, ax = plt.subplots(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=(10, 5))
     
     # Get simulated (n,alpha) rates from diamond tally
     sim_diamond_rates = {}
@@ -319,22 +324,27 @@ def plot_diamond_and_foil_yields(json_path=None, statepoint_path=None, output_di
     colors = {'Nb93': 'tab:green', 'Zr90': 'tab:orange', 'Al27': 'tab:red', 
               'In115': 'tab:purple', 'Cu65': 'tab:brown', 'Ti48': 'tab:pink'}
     
+    max_foil_rate = 0
     for detector_type, nuclides in foil_data.items():
         for nuclide, angles_data in nuclides.items():
+            if "Al" in nuclide:
+                continue  # skip aluminum foils for now since they are outliers
             if not angles_data:
                 continue
             foil_angles = []
             foil_rates = []
             foil_rate_errs = []
             for angle_str, rate_data in angles_data.items():
-                try:
-                    foil_angles.append(float(angle_str))
-                    foil_rates.append(rate_data['rate'] * 4 * np.pi * 12.0**2)  # convert to n/s
-                    foil_rate_errs.append(rate_data['rate_err'])
-                except (ValueError, KeyError):
+                if angle_str == 'NaN':
                     continue
+                
+                foil_angles.append(float(angle_str))
+                foil_rates.append(rate_data['isotropic_source_rate'])
+                foil_rate_errs.append(rate_data['isotropic_source_rate_err'])
+
             
             if foil_angles:
+                max_foil_rate = max(max_foil_rate, max(foil_rates))
                 sort_idx = np.argsort(np.abs(foil_angles))
                 foil_angles = np.abs(np.array(foil_angles))[sort_idx]
                 foil_rates = np.array(foil_rates)[sort_idx]
@@ -444,6 +454,80 @@ def read_diamond_spectra_from_h5(h5_filename):
     return loaded_data
 
 
+def convert_foil_flux_to_source_rate(model, foil_cell_volumes, 
+                                     statepoint_filepath=Path('statepoint.100.h5'),
+                                     processed_data_filepath=Path('../data/processed_data.json')):
+    """ Convert foil fluxes in units of n/cm^2/s to source rate neutrons (units of n)
+    as if the source emission were isotropic for easy comparison to diamond rates"""
+
+    # get all material cells including all foil cells
+    all_cells = model.geometry.get_all_material_cells()
+
+    # get flux tally
+    with openmc.StatePoint(statepoint_filepath) as sp:
+        flux_tally = sp.get_tally(name='foil flux tally')
+
+    simulation_fluxes = {}
+    fluxes = flux_tally.get_reshaped_data(value='mean').squeeze()
+    flux_errs = flux_tally.get_reshaped_data(value='std_dev').squeeze()
+
+    # Calculate fluxes from simulations by dividing flux from statepoint file by cell volume
+    cell_filter = flux_tally.find_filter(openmc.CellFilter)
+    for i,cell_id in enumerate(cell_filter.bins):
+        cell_name = all_cells[cell_id].name
+        simulation_fluxes[cell_name] = {
+            "value": fluxes[i] / foil_cell_volumes[cell_name],
+            "error": flux_errs[i] / foil_cell_volumes[cell_name]
+        }
+
+    # get the foil fluxes from processed_data.json
+    with open(processed_data_filepath, 'r') as f:
+        processed_data = json.load(f)
+    for cell_name in simulation_fluxes.keys():
+        element = cell_name.split('-')[0]
+        angle_str = cell_name.split('_')[-1].replace('deg', '')
+        if 'under' in angle_str:
+            continue # skip the foils underneath the generator for now
+        else:
+            angle = int(angle_str)
+        element_symbol = ELEMENT_SYMBOLS.get(element, None)
+        if element_symbol is None:
+            raise ValueError(f"Unknown element in cell name: {cell_name}")
+        # find the corresponding flux in processed_data.json
+        for detector in processed_data['foils']:
+            for nuclide in processed_data['foils'][detector]:
+                if element_symbol in nuclide:
+                    for angle_str, rate_data in processed_data['foils'][detector][nuclide].items():
+                        if angle_str == 'NaN':
+                            continue
+                        if int(angle_str) == angle:
+                            measured_rate = rate_data['flux']
+                            measured_rate_err = rate_data['flux_err']
+                            if rate_data["units"] != "n/cm^2/s":
+                                raise ValueError(f"Unexpected flux units for {cell_name}: {rate_data['units']}")    
+                            
+                            sim_flux = simulation_fluxes[cell_name]['value']
+                            sim_flux_err = simulation_fluxes[cell_name]['error']
+                            if sim_flux > 0:
+                                source_rate = measured_rate / sim_flux
+                                source_rate_err = source_rate * np.sqrt(
+                                    (measured_rate_err / measured_rate)**2 +
+                                    (sim_flux_err / sim_flux)**2
+                                )
+                                print(f"{cell_name}: volume: {foil_cell_volumes[cell_name]:.2f} cm³, ",
+                                      f"\n\tMeasured rate = {measured_rate:.2e} ± {measured_rate_err:.2e} n/s, "
+                                      f"\n\tSimulated flux = {sim_flux:.2e} ± {sim_flux_err:.2e} n/cm²/s, "
+                                      f"\n\tEstimated source rate = {source_rate:.2e} ± {source_rate_err:.2e} n")
+                                processed_data['foils'][detector][nuclide][angle_str]['isotropic_source_rate'] = source_rate
+                                processed_data['foils'][detector][nuclide][angle_str]['isotropic_source_rate_err'] = source_rate_err
+                            else:
+                                print(f"{cell_name}: Simulated flux is zero, cannot estimate source rate.")
+    # Save updated processed_data.json
+    with open(processed_data_filepath, 'w') as f:
+        json.dump(processed_data, f, indent=4)
+    
+    return
+
 
 def perform_full_analysis(iteration=0, output_dir=None, 
                           openmc_model_path=Path(__file__).parent / '../neutronics/isotropic_source'):
@@ -468,25 +552,27 @@ def perform_full_analysis(iteration=0, output_dir=None,
     #     return
 
     # build neutron source from diamond spectra
-    source_center = [0, 0, 0]
+    source_center = [507.25, 217, 10.16 + 90.5 + (11/16*2.54) + 3 * 2.54 + 20]
     diamond_spectra = read_diamond_spectra_from_h5('../data/diamond_processed_spectra.h5')
     neutron_sources = nGen_generator(diamond_spectra, center=source_center, reference_uvw=(-1, 0, 0))
 
     # build OpenMC model with this source and run it
     model, foil_cell_volumes = create_experiment_model(
         read_from_json=True,
-        # irdff_energy_groups=np.array([0, 2, 3, 6, 9, 12, 15]) * 1e6, # energy group boundaries in eV
-        irdff_energy_groups=np.array([0, 14.1e6]), # single energy group for total cross-section
-        source=None,
+        # irdff_energy_groups=np.array([0, 1, 4, 8, 12, 16]) * 1e6, # energy group boundaries in eV
+        irdff_energy_groups=np.array([13e6, 16e6]), # single energy group for total cross-section
+        source=neutron_sources,
         source_center=source_center,
         dd_dt_ratio=0.0,
-        diamond_detector_distance=14.1, # 14.1 cm from source to detector face, about 1.70 cm from detector face to diamond face
-        num_particles_per_batch=int(1e5)
+        diamond_detector_distance=14.1, # 14.1 cm from source to detector face, not to diamond face
+        num_particles_per_batch=int(3e6)
     )
+
     model.export_to_model_xml()
+    # model.plot_geometry()
     # if iteration==0:
     #     model.plot_geometry()
-    model.run(threads=14)
+    # model.run(threads=14, geometry_debug=True)
 
     foil_xs_dict = get_xs_from_tallies(
         statepoint_path = Path("statepoint.100.h5"),
@@ -502,11 +588,18 @@ def perform_full_analysis(iteration=0, output_dir=None,
     # if not run_notebook(nai_notebook_path):
     #     print("Error: NaI foil analysis notebook failed. Skipping this iteration.")
     #     return
+
+    for cell_name, volume in foil_cell_volumes.items():
+        print('\n')
+        print(f"Cell: {cell_name}, Volume: {volume:.3f} cm³")
+    
+    convert_foil_flux_to_source_rate(model=model, foil_cell_volumes=foil_cell_volumes)
     
     data = plot_diamond_and_foil_yields(json_path=Path(__file__).parent / '../data/processed_data.json',
                                         statepoint_path=Path(__file__).parent / 'statepoint.100.h5',
                                         output_dir=Path(__file__).parent, 
                                         show_plot=True)
+    
 
 
 

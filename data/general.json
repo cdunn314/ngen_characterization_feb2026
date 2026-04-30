@@ -68,14 +68,14 @@
                         ]  
                     },
                     {
-                        "angle": "under",
+                        "angle": 90,
                         "material": "In",
                         "designator": "Indium-1",
                         "irradiation_date": "2/25/2026",
                         "number_of_foils": 4,
-                        "packet_position": 3,
+                        "packet_position": [4,"bottom"],
                         "distance_to_source": {
-                            "value": 2.0,
+                            "value": 12.0,
                             "unit": "cm",
                             "note": "To generator axis at target plane"
                         },
@@ -97,14 +97,14 @@
                         ]  
                     },
                     {
-                        "angle": 90,
+                        "angle": "under",
                         "material": "In",
                         "designator": "Indium-2",
                         "irradiation_date": "2/25/2026",
                         "number_of_foils": 3,
-                        "packet_position": 4,
+                        "packet_position": 3,
                         "distance_to_source": {
-                            "value": 12.0,
+                            "value": 2.0,
                             "unit": "cm",
                             "note": "To generator axis at target plane"
                         },
@@ -178,34 +178,6 @@
                         },
                         "measurement_directory":[
                             "Titanium_270deg_count1/UNFILTERED"
-                        ]  
-                    },
-                    {
-                        "angle": 90,
-                        "material": "Ni",
-                        "designator": "Nickel-4",
-                        "irradiation_date": "2/25/2026",
-                        "number_of_foils": 8,
-                        "packet_position": [1,"top"],
-                        "distance_to_source": {
-                            "value": 12.0,
-                            "unit": "cm",
-                            "note": "To generator axis at target plane"
-                        },
-                        "mass": {
-                            "value": 2.2721,
-                            "unit": "g"
-                        },
-                        "mass_err": {
-                            "value": 0.0002,
-                            "unit": "g"
-                        },
-                        "thickness": {
-                            "value": 0.08,
-                            "unit": "inch"
-                        },
-                        "measurement_directory":[
-                            "Nickel4_90deg_count1/UNFILTERED"
                         ]  
                     },
                     {
@@ -826,6 +798,34 @@
                         },
                         "measurement_directory":[
                             "Zirconium10_150deg_count1/UNFILTERED"
+                        ]  
+                    },
+                    {
+                        "angle": 120,
+                        "material": "Zr",
+                        "designator": "Zirconium-4",
+                        "irradiation_date": "2/25/2026",
+                        "number_of_foils": 4,
+                        "packet_position": 1,
+                        "distance_to_source": {
+                            "value": 12.0,
+                            "unit": "cm",
+                            "note": "To generator axis at target plane"
+                        },
+                        "mass": {
+                            "value": 0.4539,
+                            "unit": "g"
+                        },
+                        "mass_err": {
+                            "value": 0.0002,
+                            "unit": "g"
+                        },
+                        "thickness": {
+                            "value": 0.02,
+                            "unit": "inch"
+                        },
+                        "measurement_directory":[
+                            "Zirconium4_60deg_count2/UNFILTERED"
                         ]  
                     },
                     {
