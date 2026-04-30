@@ -1,0 +1,20 @@
+{
+    "nb93_n2n": {
+            "mat_number": 410930,
+            "mt_value": 16,
+            "density_gcm3": 8.57,
+            "mass_g": 0.7317,
+            "thickness_cm": 0.1016,
+            "foil_atomic_mass": 92.906,
+            "isotope_abundance": 1
+        },
+    "ni58_n2n": {
+            "mat_number": 280580,
+            "mt_value": 16,
+            "density_gcm3": 8.90,
+            "mass_g": 1.5845,
+            "thickness_cm": 0.2032,
+            "foil_atomic_mass": 58.69,
+            "isotope_abundance": 0.681
+        }
+}
