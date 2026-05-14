@@ -49,7 +49,7 @@ diamond.add_element('C', 1.0)
 diamond.set_density('g/cm3', 3.52)
 
 file_path = Path(__file__).parent.resolve()
-print(file_path)
+# print(file_path)
 
 NUCLIDES = {niobium:'Nb93', zirconium:'Zr90', indium:'In115', nickel:'Ni58', 
                 iron:'Fe56', copper:'Cu65', titanium:'Ti48', molybdenum:'Mo92',
@@ -190,7 +190,7 @@ def get_foil_info_from_json(json_path=file_path / '../data/general.json'):
     packet_positions = {}
 
     for detector_dict in big_foil_list:
-        print(f"Processing detector dict from {detector_dict['detector_type']} data directory: {detector_dict['data_directory']}")
+        # print(f"Processing detector dict from {detector_dict['detector_type']} data directory: {detector_dict['data_directory']}")
         for foil_dict in detector_dict["materials"]:
             angle = foil_dict["angle"]
             if angle not in all_foil_dict:
@@ -268,13 +268,13 @@ def get_foil_info_from_json(json_path=file_path / '../data/general.json'):
                 print(f"Removing duplicate foil {foil_dict['name']} at angle {angle}.")
         all_foil_dict[angle] = unique_foils
     
-    print(f"Organized foil information from {json_path} into dictionary with angles as keys and lists of foil dictionaries as values.")
+    # print(f"Organized foil information from {json_path} into dictionary with angles as keys and lists of foil dictionaries as values.")
     return all_foil_dict
 
 
 def create_foils_from_json(source_center, foil_distance, json_path=file_path / '../data/general.json'):
     all_foil_dict = get_foil_info_from_json(json_path)
-    print("all_foil_dict:", all_foil_dict)
+    # print("all_foil_dict:", all_foil_dict)
     foil_regions = []
     foil_cells = []
     foil_cell_names = []
@@ -286,7 +286,7 @@ def create_foils_from_json(source_center, foil_distance, json_path=file_path / '
         # and we want to make sure they don't overlap
         distance_from_ring_dict = {}
         for foil_dict in all_foil_dict[angle]:
-            print(foil_dict)
+            # print(foil_dict)
             if angle=='under':
                 under_foil_distance = foil_dict['distance_to_source']
                 # create a foil under the source, centered at the source x and y coordinates and at the specified distance from the source in z
@@ -299,7 +299,7 @@ def create_foils_from_json(source_center, foil_distance, json_path=file_path / '
                 rotated_foil_region = -foil_cylinder & -foil_top_plane & +foil_bottom_plane
             else:
                 if isinstance(foil_dict['packet_position'], list):
-                    print("Inside list packet position case for foil:", foil_dict['name'], "at angle", angle)
+                    # print("Inside list packet position case for foil:", foil_dict['name'], "at angle", angle)
                     vertical_position = foil_dict['packet_position'][1]
                     # initialize distance from ring for this vertical position if it doesn't exist yet
                     if distance_from_ring_dict.get(vertical_position) is None:
@@ -312,7 +312,7 @@ def create_foils_from_json(source_center, foil_distance, json_path=file_path / '
                     foil_cylinder = openmc.XCylinder(r=0.25*2.54,
                                                     y0=source_center[1],
                                                     z0=z0)
-                    print("foil_cylinder", foil_cylinder)
+                    # print("foil_cylinder", foil_cylinder)
                     foil_front_plane = openmc.XPlane(x0=source_center[0] - foil_distance + distance_from_ring_dict[vertical_position])
                     foil_back_plane = openmc.XPlane(
                         x0=source_center[0] - foil_distance + foil_dict['thickness'] + distance_from_ring_dict[vertical_position]
@@ -342,9 +342,10 @@ def create_foils_from_json(source_center, foil_distance, json_path=file_path / '
             foil_cell_names.append(f"{foil_dict['name']}_foil_{angle}deg")
             distance_from_ring += foil_dict['thickness']
     
-    print(f"Created foils with names: ")
+    # print(f"Created foils with names: ")
     for name in foil_cell_names:
-        print(name)
+        # print(name)
+        pass
 
     return foil_cells, foil_regions, foil_cell_volumes
 
@@ -393,10 +394,11 @@ def make_irdff_tallies(foil_cells, energy_groups=None):
             for i in range(len(cross_sections[mt].x)-1):
                 # if energies are out of order, raise error
                 if cross_sections[mt].x[true_i] > cross_sections[mt].x[true_i+1]:
-                    print(f"Energy at index {i} is out of order: {cross_sections[mt].x[true_i]} > {cross_sections[mt].x[true_i+1]}")
-                    print("Cross section values around this energy:")
+                    # print(f"Energy at index {i} is out of order: {cross_sections[mt].x[true_i]} > {cross_sections[mt].x[true_i+1]}")
+                    # print("Cross section values around this energy:")
                     for j in range(max(0, true_i-2), min(len(cross_sections[mt].x), true_i+3)):
-                        print(f"  Index {j}: Energy = {cross_sections[mt].x[j]}, Cross Section = {cross_sections[mt].y[j]}")
+                        # print(f"  Index {j}: Energy = {cross_sections[mt].x[j]}, Cross Section = {cross_sections[mt].y[j]}")
+                        pass
                     raise ValueError(f"Cross section energies for {nuclide} MT {mt} are not in ascending order.")
                 # if there are duplicate energies, use second energy value (which should be the same as the first) and skip to next energy
                 elif cross_sections[mt].x[true_i] == cross_sections[mt].x[true_i+1]:
@@ -445,7 +447,7 @@ def get_xs_from_tallies(statepoint_path: Path, foil_cell_volumes: dict, json_pat
         geometry = sp.summary.geometry
         irdff_tally_names = get_irdff_tally_names(json_path)
         for name in irdff_tally_names:
-            print("Getting tally with name:", name)
+            # print("Getting tally with name:", name)
             irdff_tallies[name] = sp.get_tally(name=name)
 
     all_cells = geometry.get_all_cells()
@@ -600,7 +602,7 @@ def get_diamond_n_alpha_rates(statepoint_path: Path):
     # Sort by angle
     diamond_rates = dict(sorted(diamond_rates.items()))
     
-    print(f"Retrieved (n,α) rates for {len(diamond_rates)} diamond detector angles")
+    # print(f"Retrieved (n,α) rates for {len(diamond_rates)} diamond detector angles")
     return diamond_rates
 
 
@@ -623,7 +625,7 @@ def create_experiment_model(foil_angles=None,
         foil_angles = []
     if diamond_angles is None:
         diamond_angles, diamond_detector_distances = get_diamond_info_from_json()
-        print("Diamond detector distances from JSON:", diamond_detector_distances)
+        # print("Diamond detector distances from JSON:", diamond_detector_distances)
     else:
         diamond_detector_distances = [diamond_detector_distance] * len(diamond_angles)
 
@@ -1004,7 +1006,7 @@ def create_experiment_model(foil_angles=None,
         [1500/(1500 + 930 + 1274), 930/(1500 + 930 + 1274), 1274/(1500 + 930 + 1274)],
         percent_type='vo'
     )
-    print("Fluorinert Plastic Mix density:", fluorinert_plastic_mix.get_mass_density())
+    # print("Fluorinert Plastic Mix density:", fluorinert_plastic_mix.get_mass_density())
 
     # from PNNL Materials Compendium Aluminum, alloy 6061-O
     # just a guess that this is the aluminum alloy used in the nGen main tube
@@ -1215,7 +1217,7 @@ def create_experiment_model(foil_angles=None,
     foil_spectrum_tally = openmc.Tally(name='foil spectrum tally')
     foil_energy_filter = openmc.EnergyFilter(openmc.mgxs.GROUP_STRUCTURES["CCFE-709"])
     # foil_spectrum_tally.filters = [foil_cell_filter, foil_energy_filter]
-    foil_spectrum_tally.filters = [foil_cell_filter, diamond_energy_filter]
+    foil_spectrum_tally.filters = [foil_cell_filter, foil_energy_filter]
     foil_spectrum_tally.scores = ['flux']
 
 
