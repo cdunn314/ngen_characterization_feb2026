@@ -36,13 +36,14 @@ from experiment_model import SYMBOLS_TO_MATERIALS, MT_NUMBERS
 
 
 
+
 script_path = Path(__file__).parent.resolve()
 
 # Path to save the extracted files
-output_path = Path("../../data/")
+output_path = script_path / Path("../../data/")
 activation_foil_path = output_path
 
-def read_foil_xs_from_processed_data(json_path='../../data/processed_data.json'):
+def read_foil_xs_from_processed_data(json_path=script_path / '../../data/processed_data.json'):
     """
     Read foil cross-section data from the processed_data.json file.
     
@@ -449,7 +450,7 @@ def get_data(download_from_raw=False,
              foil_source_dict=None,
              h5_filename="activation_data.h5",
              detector_type="NaI"):
-    with open("../../data/general.json", "r") as f:
+    with open(script_path / "../../data/general.json", "r") as f:
         general_data = json.load(f)
         json_data_list = general_data["neutron_detection"]["foils"]
     
@@ -655,7 +656,7 @@ def read_foil_measurements_from_dir(
 
 # Get the irradiation schedule
 
-with open("../../data/general.json", "r") as f:
+with open(script_path / "../../data/general.json", "r") as f:
     general_data = json.load(f)
 irradiations = []
 for generator in general_data["generators"]:
@@ -1492,7 +1493,7 @@ def build_response_matrix(foil_measurements_list,
 
 
 
-def build_response_matrix_from_processed_data(angle, processed_data_json_filepath='../../data/processed_data.json'):
+def build_response_matrix_from_processed_data(angle, processed_data_json_filepath=script_path / '../../data/processed_data.json'):
 
     with open(processed_data_json_filepath, 'r') as f:
         processed_data = json.load(f)
